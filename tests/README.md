@@ -33,18 +33,23 @@ Tests are organized using pytest markers:
 # Install all dependencies including test tools
 poetry install --with test
 
-# Or with pip
+# Or with pip (if not using Poetry)
 pip install pytest pytest-asyncio pytest-cov pytest-mock
 ```
+
+**⚠️ Important**: You must install test dependencies first, otherwise you'll get coverage-related errors.
 
 ### Run All Tests
 
 ```bash
-# Run complete test suite with coverage
+# Run complete test suite with coverage (after installing test dependencies)
 poetry run pytest
 
-# Or directly with pytest
+# Or directly with pytest (if test dependencies are installed)
 pytest
+
+# Run without coverage (if pytest-cov is not installed)
+pytest --no-cov
 ```
 
 ### Run Specific Test Categories
@@ -262,10 +267,20 @@ pytest --pdb
 
 ### Common Issues
 
-1. **Port conflicts**: Tests use random ports to avoid conflicts
-2. **Async cleanup**: All async resources are properly cleaned up
-3. **Mock isolation**: Each test gets fresh mocks
-4. **Server lifecycle**: Test servers are started/stopped per test
+1. **Coverage errors** (`unrecognized arguments: --cov=xian_uwp`):
+   ```bash
+   # Solution: Install test dependencies first
+   poetry install --with test
+   # Or: pip install pytest-cov pytest-asyncio pytest-mock
+   ```
+
+2. **Port conflicts**: Tests use random ports to avoid conflicts
+
+3. **Async cleanup**: All async resources are properly cleaned up
+
+4. **Mock isolation**: Each test gets fresh mocks
+
+5. **Server lifecycle**: Test servers are started/stopped per test
 
 ## 📊 Test Metrics
 

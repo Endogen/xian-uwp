@@ -991,6 +991,32 @@ const balance = await XianWalletUtils.getBalance("currency");
 
 ## Development & Testing
 
+### Running Tests
+
+```bash
+# Install test dependencies first
+poetry install --with test
+
+# Run all tests with coverage
+poetry run pytest
+
+# Run without coverage (if pytest-cov not installed)
+poetry run pytest --no-cov
+
+# Run specific test categories
+poetry run pytest -m unit      # Unit tests only
+poetry run pytest -m cors      # CORS tests only
+poetry run pytest -m e2e       # End-to-end tests only
+```
+
+**Common Issue**: If you get `unrecognized arguments: --cov=xian_uwp`, install test dependencies:
+```bash
+poetry install --with test
+# Or: pip install pytest pytest-cov pytest-asyncio pytest-mock
+```
+
+See `tests/README.md` for detailed testing documentation.
+
 ### Running the Protocol Server Directly
 
 ```bash
