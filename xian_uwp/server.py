@@ -19,8 +19,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from xian_py.wallet import Wallet
-from xian_py.xian import Xian
-from xian_py.transaction import simulate_tx, get_nonce, create_tx, broadcast_tx_sync
+from xian_py.xian_async import XianAsync
+from xian_py.transaction import simulate_tx_async, get_nonce_async, create_tx, broadcast_tx_sync_async
 
 from .models import (
     WalletType, Permission, ProtocolConfig, Endpoints, ErrorCodes, CORSConfig,
@@ -55,7 +55,7 @@ class WalletProtocolServer:
         self.server_task = None
         self.is_running = False
         self.wallet = wallet
-        self.xian_client: Optional[Xian] = None
+        self.xian_client: Optional[XianAsync] = None
         self.is_locked = True
         self.password_hash: Optional[str] = None
         
@@ -107,7 +107,7 @@ class WalletProtocolServer:
             logger.info("🚀 Xian Wallet Protocol Server starting...")
             # Initialize network client if wallet and network are configured
             if self.wallet and self.network_url:
-                self.xian_client = Xian(self.network_url, wallet=self.wallet)
+                self.xian_client = XianAsync(self.network_url, wallet=self.wallet)
                 logger.info(f"📍 Wallet initialized: {self.wallet.public_key}")
             # Start background tasks
             cleanup_task = asyncio.create_task(self._cleanup_task())
@@ -439,7 +439,7 @@ class WalletProtocolServer:
                 if not self.xian_client:
                     raise HTTPException(status_code=503, detail="Network client not configured")
                 
-                balance = self.xian_client.get_balance(self.wallet.public_key, contract=contract)
+                balance = await self.xian_client.get_balance(self.wallet.public_key, contract=contract)
                 response = BalanceResponse(balance=balance, contract=contract)
                 self._set_cache(cache_key, response)
                 return response
@@ -454,7 +454,7 @@ class WalletProtocolServer:
             self._validate_network_config()
             
             try:
-                nonce = get_nonce(self.network_url, self.wallet.public_key)
+                nonce = await get_nonce_async(self.network_url, self.wallet.public_key)
                 
                 payload = {
                     "chain_id": self.chain_id,
@@ -468,12 +468,12 @@ class WalletProtocolServer:
                 
                 # Estimate stamps if not provided
                 if not request.stamps_supplied:
-                    simulated = simulate_tx(self.network_url, payload)
+                    simulated = await simulate_tx_async(self.network_url, payload)
                     payload["stamps_supplied"] = simulated.get("stamps_used", 50000)
                 
                 # Create and broadcast transaction
                 tx = create_tx(payload, self.wallet)
-                result = broadcast_tx_sync(self.network_url, tx)
+                result = await broadcast_tx_sync_async(self.network_url, tx)
                 
                 # Clear balance cache after transaction
                 self._clear_cache_pattern("balance_")
@@ -692,7 +692,7 @@ class WalletProtocolServer:
         
         # Initialize network client if network is configured
         if self.network_url:
-            self.xian_client = Xian(self.network_url, wallet=self.wallet)
+            self.xian_client = XianAsync(self.network_url, wallet=self.wallet)
             logger.info(f"📍 Wallet configured: {self.wallet.public_key}")
     
     def lock_wallet(self):
