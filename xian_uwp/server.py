@@ -123,6 +123,8 @@ class WalletProtocolServer:
             # Wait for all tasks to complete cancellation
             await asyncio.gather(*self.background_tasks, return_exceptions=True)
             self.background_tasks.clear()
+            
+
         
         app = FastAPI(
             title="Xian Wallet Protocol Server",
@@ -439,7 +441,9 @@ class WalletProtocolServer:
                 if not self.xian_client:
                     raise HTTPException(status_code=503, detail="Network client not configured")
                 
-                balance = self.xian_client.get_balance(self.wallet.public_key, contract=contract)
+                balance = await asyncio.to_thread(
+                    self.xian_client.get_balance, self.wallet.public_key, contract=contract
+                )
                 response = BalanceResponse(balance=balance, contract=contract)
                 self._set_cache(cache_key, response)
                 return response
@@ -454,7 +458,10 @@ class WalletProtocolServer:
             self._validate_network_config()
             
             try:
-                nonce = get_nonce(self.network_url, self.wallet.public_key)
+                # Run synchronous functions in thread pool to avoid blocking
+                nonce = await asyncio.to_thread(
+                    get_nonce, self.network_url, self.wallet.public_key
+                )
                 
                 payload = {
                     "chain_id": self.chain_id,
@@ -468,12 +475,16 @@ class WalletProtocolServer:
                 
                 # Estimate stamps if not provided
                 if not request.stamps_supplied:
-                    simulated = simulate_tx(self.network_url, payload)
+                    simulated = await asyncio.to_thread(
+                        simulate_tx, self.network_url, payload
+                    )
                     payload["stamps_supplied"] = simulated.get("stamps_used", 50000)
                 
                 # Create and broadcast transaction
                 tx = create_tx(payload, self.wallet)
-                result = broadcast_tx_sync(self.network_url, tx)
+                result = await asyncio.to_thread(
+                    broadcast_tx_sync, self.network_url, tx
+                )
                 
                 # Clear balance cache after transaction
                 self._clear_cache_pattern("balance_")
