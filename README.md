@@ -677,10 +677,16 @@ const ws = new WebSocket('ws://localhost:8545/ws/v1');
 ### 1. Install Core Protocol
 
 ```bash
-pip install xian-uwp
+# Clone the repository
+git clone https://github.com/Endogen/xian-uwp.git
+cd xian-uwp
+
+# For Python implementations, install dependencies
+cd reference/python
+pip install -r requirements.txt  # If available
 ```
 
-**This installs all core dependencies:**
+**Core Protocol Dependencies (Python Reference):**
 - `fastapi` - HTTP API server framework
 - `uvicorn` - ASGI server to run FastAPI
 - `httpx` - Async HTTP client for wallet connections  
@@ -688,30 +694,11 @@ pip install xian-uwp
 - `pydantic` - Data validation and serialization
 - `xian-py` - Xian blockchain SDK for wallet operations
 
-> **Note**: The PyPI package contains only the core protocol. To run the example wallets and DApps, you need to clone this repository and run them from source.
+> **Note**: The protocol specification is language-agnostic. You can implement it in any programming language.
 
-### 2. Optional Dependencies (Install as needed)
+### 2. Using the Protocol
 
-**For Desktop Wallet Development:**
-```bash
-pip install flet>=0.28.3
-```
-
-**For CLI Wallet Development:**
-```bash
-pip install click>=8.2.1
-pip install cryptography>=41.0.0  # For encrypted wallet storage
-```
-
-**For Running Examples:**
-```bash
-pip install flet>=0.28.3  # Required for Flet examples
-pip install reflex>=0.8.6  # Required for Reflex examples
-```
-
-### 2. Using in Your Own Projects
-
-After installing `pip install xian-uwp`, you can use the protocol in your own wallet or DApp:
+**For Python Implementations:**
 
 **For DApp Development:**
 ```python
@@ -740,115 +727,91 @@ server.run()  # Starts on localhost:8545
 ### 3. Project Structure
 
 ```
-xian-universal-wallet-protocol/
-├── xian_uwp/
-│   ├── __init__.py
-│   ├── models.py          # Data models & constants
-│   ├── server.py          # Universal protocol server  
-│   └── client.py          # Universal client library
-├── examples/
-│   ├── wallets/           # Wallet implementation examples
-│   │   ├── desktop.py     # Desktop wallet example (requires: flet)
-│   │   ├── web.py         # Web wallet example (requires: flet)
-│   │   └── cli.py         # CLI wallet example (requires: click, cryptography)
-│   └── dapps/             # DApp examples
-│       ├── universal_dapp.py  # Flet DApp example (requires: flet)
-│       ├── reflex_dapp.py     # Reflex DApp example (requires: reflex)
-│       └── html-js-dapp/      # Pure HTML/JS DApp example (no dependencies)
-├── tests/                 # Test suite
-│   ├── test_simple.py     # Basic component tests
-│   ├── test_protocol.py   # Protocol integration tests
-│   ├── test_server.py     # Server functionality tests
-│   └── test_e2e.py        # End-to-end tests
+xian-uwp/
+├── protocol/              # Language-agnostic protocol specification
+│   ├── SPECIFICATION.md   # Complete protocol specification
+│   ├── openapi.yaml       # OpenAPI 3.0 specification
+│   ├── schemas/           # JSON Schema definitions
+│   │   ├── events/        # WebSocket event schemas
+│   │   ├── requests/      # Request message schemas
+│   │   └── responses/     # Response message schemas
+│   ├── test-vectors/      # Compliance test vectors
+│   │   ├── auth-flow.json
+│   │   └── transaction-flow.json
+│   └── validator.py       # Test vector validator
+├── reference/             # Reference implementations
+│   └── python/            # Python reference implementation
+│       ├── xian_uwp/
+│       │   ├── __init__.py
+│       │   ├── models.py      # Data models & constants
+│       │   ├── server.py      # Protocol server implementation
+│       │   ├── server_utils.py # Server utilities
+│       │   └── client.py      # Client library
+│       └── README.md
+├── docs/                  # Documentation
+│   ├── IMPLEMENTATION.md  # Implementation guide
+│   └── COMPLIANCE.md      # Compliance testing guide
+├── CONTRIBUTING.md        # Contribution guidelines
 └── README.md
 ```
 
 **Important Notes:**
-- **Core Protocol**: Only files in `xian_uwp/` directory are the actual protocol implementation
-- **Examples**: All files in `examples/` are reference implementations to learn from
-- **PyPI Package**: Install with `pip install xian-uwp` for production use
-- **Development**: When running examples from source, use `PYTHONPATH=.` to import the protocol modules correctly
+- **Protocol Specification**: The `protocol/` directory contains the language-agnostic specification
+- **Reference Implementation**: The `reference/python/` directory contains a Python implementation
+- **Test Vectors**: Use the test vectors in `protocol/test-vectors/` to verify compliance
+- **Language Support**: Implementations can be created in any programming language
 
-**Example Files Explained:**
-- `desktop.py` - Shows how to embed the protocol server in a desktop GUI application
-- `web.py` - Demonstrates a browser-based wallet using Flet (100% Python, no JavaScript)
-- `cli.py` - Example of a command-line wallet with daemon mode
-- `universal_dapp.py` - Sample DApp showing wallet integration with Flet UI
-- `reflex_dapp.py` - Sample DApp using the Reflex framework instead of Flet
-- `html-js-dapp/` - Pure HTML/JavaScript DApp example (no Python frameworks required)
+### 4. Testing the Protocol
 
-### 4. Run Desktop Wallet Example
-
+**Run Test Vectors:**
 ```bash
-# Install dependencies
-pip install xian-uwp flet>=0.28.3
+# Validate your implementation against test vectors
+cd protocol
+python validator.py
 
-# Run desktop wallet example (requires source code)
-PYTHONPATH=. python examples/wallets/desktop.py
+# This will validate the test vectors in:
+# - test-vectors/auth-flow.json
+# - test-vectors/transaction-flow.json
 ```
 
-### 5. Run Web Wallet Example
-
+**Start a Test Server:**
 ```bash
-# Install dependencies
-pip install xian-uwp flet>=0.28.3
+# Using the Python reference implementation
+cd reference/python
+python -m xian_uwp.server
 
-# Run web wallet example (opens in browser, requires source code)
-PYTHONPATH=. python examples/wallets/web.py
+# Server starts on localhost:8545
+# Creates a demo wallet for testing
 ```
 
-### 6. Run CLI Wallet Example
+### 5. Implementation Guide
 
-```bash
-# Install dependencies
-pip install xian-uwp click>=8.2.1 cryptography>=41.0.0
+See the [Implementation Guide](docs/IMPLEMENTATION.md) for:
+- Step-by-step implementation instructions
+- Security requirements
+- Error handling guidelines
+- Best practices
 
-# Create wallet (requires source code)
-PYTHONPATH=. python examples/wallets/cli.py create
+### 6. Compliance Testing
 
-# Start daemon
-PYTHONPATH=. python examples/wallets/cli.py start
-```
+See the [Compliance Guide](docs/COMPLIANCE.md) for:
+- Test vector structure
+- Validation requirements
+- Compliance certification process
 
-### 7. Run DApp Examples
+### 7. Protocol Specification
 
-**Flet DApp Example:**
-```bash
-# Install dependencies
-pip install xian-uwp flet>=0.28.3
+The complete protocol specification is available in:
+- [Protocol Specification](protocol/SPECIFICATION.md) - Human-readable specification
+- [OpenAPI Specification](protocol/openapi.yaml) - Machine-readable API definition
+- [JSON Schemas](protocol/schemas/) - Message format definitions
 
-# Run Flet DApp example (requires source code)
-PYTHONPATH=. python examples/dapps/universal_dapp.py
-```
+## Implementation Examples
 
-**Reflex DApp Example:**
-```bash
-# Install dependencies
-pip install xian-uwp reflex>=0.8.6
-
-# Run Reflex DApp example (requires source code)
-cd examples/dapps && PYTHONPATH=../.. reflex run
-```
-
-**HTML/JavaScript DApp Example:**
-```bash
-# No dependencies required - pure HTML/CSS/JavaScript
-
-# Serve the files (required for CORS)
-cd examples/dapps/html-js-dapp
-python -m http.server 8080
-
-# Open http://localhost:8080 in your browser
-```
-
-## Example Implementations
-
-### Flet DApp Example
+### Python DApp Implementation
 
 ```python
-# examples/dapps/universal_dapp.py
-# Requires: pip install flet>=0.28.3
-
+# Using the Python reference implementation
 from xian_uwp.client import XianWalletClientSync
 
 class MyDApp:
@@ -856,9 +819,11 @@ class MyDApp:
         self.client = XianWalletClientSync("My DApp")
     
     def connect_wallet(self):
-        self.client.connect()
-        info = self.client.get_wallet_info()
-        print(f"Connected: {info.address}")
+        if self.client.connect():
+            info = self.client.get_wallet_info()
+            print(f"Connected: {info.address}")
+            return True
+        return False
     
     def send_tokens(self, to, amount):
         result = self.client.send_transaction(
@@ -868,53 +833,43 @@ class MyDApp:
         return result.success
 ```
 
-### Reflex DApp Example
+### Python Wallet Implementation
 
 ```python
-# examples/dapps/reflex_dapp.py  
-# Requires: pip install reflex>=0.8.6
+# Using the Python reference implementation
+from xian_uwp.server import WalletProtocolServer
+from xian_uwp.models import WalletType
 
-import reflex as rx
-from xian_uwp.client import XianWalletClientSync
+# Create and configure server
+server = WalletProtocolServer(
+    wallet_type=WalletType.DESKTOP,
+    session_duration=3600,
+    auto_lock_minutes=30
+)
 
-class WalletState(rx.State):
-    """Wallet DApp state with Reflex"""
-    is_connected: bool = False
-    wallet_address: str = "No wallet connected"
-    
-    async def connect_wallet(self):
-        self._client = XianWalletClientSync("Reflex DApp")
-        success = self._client.connect()
-        if success:
-            info = self._client.get_wallet_info()
-            self.is_connected = True
-            self.wallet_address = info.truncated_address
+# Set up wallet handlers
+@server.on_authorize
+def handle_authorization(app_name, permissions):
+    # Show authorization UI to user
+    # Return True if approved, False if denied
+    return user_approves(app_name, permissions)
 
-def index():
-    return rx.center(
-        rx.vstack(
-            rx.heading("Universal Xian DApp"),
-            rx.text(WalletState.wallet_address),
-            rx.button(
-                "Connect Wallet",
-                on_click=WalletState.connect_wallet,
-                disabled=WalletState.is_connected
-            )
-        )
-    )
+@server.on_sign_transaction
+def handle_transaction(tx_data):
+    # Show transaction details to user
+    # Sign if approved
+    if user_approves_tx(tx_data):
+        return sign_transaction(tx_data)
+    return None
 
-app = rx.App()
-app.add_page(index)
+# Start server
+server.run()  # Starts on localhost:8545
 ```
 
-**All examples work with any wallet type:** Desktop, Web, CLI, or Hardware wallets.
-
-### HTML/JavaScript DApp Example
+### JavaScript DApp Implementation
 
 ```javascript
-// examples/dapps/html-js-dapp/xian-wallet-client.js
-// Pure JavaScript client - no frameworks required
-
+// Direct HTTP API implementation
 class XianWalletClient {
     constructor(appName, appUrl = 'http://localhost', serverUrl = 'http://127.0.0.1:8545') {
         this.appName = appName;
@@ -926,15 +881,35 @@ class XianWalletClient {
 
     async connect() {
         // Request authorization
-        const authResponse = await this.requestAuthorization();
+        const authResponse = await fetch(`${this.serverUrl}/api/v1/authorize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                app_name: this.appName,
+                app_url: this.appUrl,
+                permissions: ['view_balance', 'send_transaction']
+            })
+        });
         
-        // Wait for user approval
-        const approval = await this.pollForApproval(authResponse.request_id);
+        const auth = await authResponse.json();
         
-        this.sessionToken = approval.session_token;
-        this.isConnected = true;
-        
-        return { success: true, walletInfo: await this.getWalletInfo() };
+        // Poll for approval
+        while (true) {
+            const statusResponse = await fetch(
+                `${this.serverUrl}/api/v1/authorize/${auth.request_id}`
+            );
+            const status = await statusResponse.json();
+            
+            if (status.status === 'approved') {
+                this.sessionToken = status.session_token;
+                this.isConnected = true;
+                return true;
+            } else if (status.status === 'denied') {
+                return false;
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
     }
 
     async sendTransaction(contract, functionName, kwargs, stampsSupplied = 50000) {
@@ -945,24 +920,16 @@ class XianWalletClient {
                 'Authorization': `Bearer ${this.sessionToken}`
             },
             body: JSON.stringify({
-                contract, function: functionName, kwargs, stamps_supplied: stampsSupplied
+                contract, 
+                function: functionName, 
+                kwargs, 
+                stamps_supplied: stampsSupplied
             })
         });
         return await response.json();
     }
 }
-
-// Usage in HTML
-const client = new XianWalletClient('My HTML DApp');
-await client.connect();
-const balance = await client.getBalance('currency');
 ```
-
-**Features:**
-- **Pure HTML/CSS/JavaScript** - No build tools or frameworks
-- **Universal Wallet Support** - Works with any wallet type
-- **Complete API Coverage** - All protocol features available
-- **Modern JavaScript** - Uses async/await and fetch API
 
 ### Web DApp Example
 
