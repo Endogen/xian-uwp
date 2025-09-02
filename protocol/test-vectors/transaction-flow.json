@@ -1,0 +1,198 @@
+{
+  "name": "Transaction Flow Test Vectors",
+  "version": "2.0.0",
+  "description": "Test vectors for transaction operations. Requires valid session token.",
+  "prerequisites": {
+    "session_token": "Valid session token with 'transactions' permission",
+    "wallet_unlocked": true
+  },
+  "vectors": [
+    {
+      "id": "tx-001",
+      "description": "Valid transaction request - currency transfer",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/transaction",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${session_token}"
+        },
+        "body": {
+          "contract": "currency",
+          "function": "transfer",
+          "kwargs": {
+            "to": "recipient_address_1234567890abcdef",
+            "amount": 100.5
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": "BOOLEAN",
+          "transaction_hash": "STRING:OPTIONAL:REGEX:^[a-fA-F0-9]{64}$",
+          "result": "ANY:OPTIONAL",
+          "errors": "ARRAY:OPTIONAL",
+          "gas_used": "NUMBER:OPTIONAL"
+        }
+      }
+    },
+    {
+      "id": "tx-002",
+      "description": "Valid transaction with gas limit",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/transaction",
+        "headers": {
+          "Authorization": "Bearer ${session_token}"
+        },
+        "body": {
+          "contract": "currency",
+          "function": "transfer",
+          "kwargs": {
+            "to": "recipient_address",
+            "amount": 50
+          },
+          "stamps_supplied": 100000
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": "BOOLEAN"
+        }
+      }
+    },
+    {
+      "id": "tx-003",
+      "description": "Invalid transaction - missing contract",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/transaction",
+        "headers": {
+          "Authorization": "Bearer ${session_token}"
+        },
+        "body": {
+          "function": "transfer",
+          "kwargs": {
+            "to": "recipient",
+            "amount": 100
+          }
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": "STRING",
+          "code": "INVALID_REQUEST"
+        }
+      }
+    },
+    {
+      "id": "tx-004",
+      "description": "Transaction without authorization",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/transaction",
+        "body": {
+          "contract": "currency",
+          "function": "transfer",
+          "kwargs": {
+            "to": "recipient",
+            "amount": 100
+          }
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "error": "STRING",
+          "code": "UNAUTHORIZED"
+        }
+      }
+    },
+    {
+      "id": "tx-005",
+      "description": "Transaction with expired session",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/transaction",
+        "headers": {
+          "Authorization": "Bearer expired_token_12345"
+        },
+        "body": {
+          "contract": "currency",
+          "function": "transfer",
+          "kwargs": {
+            "to": "recipient",
+            "amount": 100
+          }
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "error": "STRING",
+          "code": "SESSION_EXPIRED"
+        }
+      }
+    },
+    {
+      "id": "tx-006",
+      "description": "Transaction with insufficient permissions",
+      "prerequisites": {
+        "session_token": "Valid session token with only 'wallet_info' permission"
+      },
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/transaction",
+        "headers": {
+          "Authorization": "Bearer ${session_token}"
+        },
+        "body": {
+          "contract": "currency",
+          "function": "transfer",
+          "kwargs": {
+            "to": "recipient",
+            "amount": 100
+          }
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "error": "STRING"
+        }
+      }
+    },
+    {
+      "id": "tx-007",
+      "description": "Transaction when wallet is locked",
+      "prerequisites": {
+        "wallet_unlocked": false
+      },
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/transaction",
+        "headers": {
+          "Authorization": "Bearer ${session_token}"
+        },
+        "body": {
+          "contract": "currency",
+          "function": "transfer",
+          "kwargs": {
+            "to": "recipient",
+            "amount": 100
+          }
+        }
+      },
+      "response": {
+        "status": 423,
+        "body": {
+          "error": "STRING",
+          "code": "WALLET_LOCKED"
+        }
+      }
+    }
+  ]
+}

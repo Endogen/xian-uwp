@@ -1,0 +1,169 @@
+{
+  "name": "Authorization Flow Test Vectors",
+  "version": "2.0.0",
+  "description": "Test vectors for the authorization flow. All implementations must pass these tests.",
+  "vectors": [
+    {
+      "id": "auth-001",
+      "description": "Valid authorization request with minimal permissions",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/auth/request",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "app_name": "Test DApp",
+          "app_url": "https://testdapp.example.com",
+          "permissions": ["wallet_info"]
+        }
+      },
+      "response": {
+        "status": 202,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "request_id": "STRING:REGEX:^[a-zA-Z0-9_-]{16,}$",
+          "status": "pending",
+          "app_name": "Test DApp"
+        }
+      }
+    },
+    {
+      "id": "auth-002",
+      "description": "Valid authorization request with all permissions",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/auth/request",
+        "body": {
+          "app_name": "Full Access DApp",
+          "app_url": "https://fulldapp.example.com",
+          "permissions": ["wallet_info", "balance", "transactions", "sign_message", "add_token"],
+          "description": "Requesting full wallet access for testing"
+        }
+      },
+      "response": {
+        "status": 202,
+        "body": {
+          "request_id": "STRING:REGEX:^[a-zA-Z0-9_-]{16,}$",
+          "status": "pending"
+        }
+      }
+    },
+    {
+      "id": "auth-003",
+      "description": "Invalid authorization request - missing app_name",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/auth/request",
+        "body": {
+          "app_url": "https://invalid.example.com",
+          "permissions": ["wallet_info"]
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": "STRING",
+          "code": "INVALID_REQUEST"
+        }
+      }
+    },
+    {
+      "id": "auth-004",
+      "description": "Invalid authorization request - invalid permission",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/auth/request",
+        "body": {
+          "app_name": "Invalid DApp",
+          "app_url": "https://invalid.example.com",
+          "permissions": ["invalid_permission"]
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": "STRING",
+          "code": "INVALID_REQUEST"
+        }
+      }
+    },
+    {
+      "id": "auth-005",
+      "description": "Invalid authorization request - empty permissions",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/auth/request",
+        "body": {
+          "app_name": "Empty Permissions DApp",
+          "app_url": "https://empty.example.com",
+          "permissions": []
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": "STRING",
+          "code": "INVALID_REQUEST"
+        }
+      }
+    },
+    {
+      "id": "auth-006",
+      "description": "Check status of non-existent request",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/auth/status/nonexistent_request_id_12345"
+      },
+      "response": {
+        "status": 404,
+        "body": {
+          "error": "STRING",
+          "code": "STRING"
+        }
+      }
+    },
+    {
+      "id": "auth-007",
+      "description": "Invalid authorization request - malformed URL",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/auth/request",
+        "body": {
+          "app_name": "Malformed URL DApp",
+          "app_url": "not-a-valid-url",
+          "permissions": ["wallet_info"]
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": "STRING",
+          "code": "INVALID_REQUEST"
+        }
+      }
+    },
+    {
+      "id": "auth-008",
+      "description": "Valid authorization request with localhost URL",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/auth/request",
+        "body": {
+          "app_name": "Local DApp",
+          "app_url": "http://localhost:3000",
+          "permissions": ["wallet_info", "balance"]
+        }
+      },
+      "response": {
+        "status": 202,
+        "body": {
+          "request_id": "STRING:REGEX:^[a-zA-Z0-9_-]{16,}$",
+          "status": "pending"
+        }
+      }
+    }
+  ]
+}

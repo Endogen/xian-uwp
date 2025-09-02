@@ -1,0 +1,896 @@
+openapi: 3.0.3
+info:
+  title: Xian Universal Wallet Protocol
+  version: 2.0.0
+  description: |
+    Language-agnostic protocol specification for wallet and DApp communication on the Xian blockchain.
+    
+    This specification defines the standard interface that all wallet implementations must provide,
+    enabling any DApp to communicate with any wallet regardless of implementation language.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  contact:
+    name: Xian Network
+    url: https://xian.org
+    email: protocol@xian.org
+
+servers:
+  - url: http://localhost:8545/api/v1
+    description: Default local wallet server
+  - url: http://{host}:{port}/api/v1
+    description: Custom wallet server
+    variables:
+      host:
+        default: localhost
+        description: Wallet server hostname
+      port:
+        default: '8545'
+        description: Wallet server port
+
+tags:
+  - name: Status
+    description: Wallet status and health endpoints
+  - name: Authorization
+    description: DApp authorization and session management
+  - name: Wallet
+    description: Wallet information and management
+  - name: Transactions
+    description: Transaction operations
+  - name: Tokens
+    description: Token management
+
+paths:
+  /wallet/status:
+    get:
+      tags: [Status]
+      summary: Get wallet status
+      description: Check if wallet is available and get basic status information. No authentication required.
+      operationId: getWalletStatus
+      responses:
+        '200':
+          description: Wallet status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletStatus'
+        '503':
+          description: Wallet service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/request:
+    post:
+      tags: [Authorization]
+      summary: Request authorization
+      description: Request authorization from the wallet for DApp access
+      operationId: requestAuthorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorizationRequest'
+      responses:
+        '202':
+          description: Authorization request accepted and pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorizationPending'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many pending requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/status/{request_id}:
+    get:
+      tags: [Authorization]
+      summary: Check authorization status
+      description: Check the status of a pending authorization request
+      operationId: getAuthorizationStatus
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          description: Authorization request ID
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]{16,}$'
+      responses:
+        '200':
+          description: Authorization status retrieved
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/AuthorizationPending'
+                  - $ref: '#/components/schemas/AuthorizationApproved'
+                  - $ref: '#/components/schemas/AuthorizationDenied'
+        '404':
+          description: Request not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/approve/{request_id}:
+    post:
+      tags: [Authorization]
+      summary: Approve authorization request
+      description: Approve a pending authorization request (wallet UI operation)
+      operationId: approveAuthorization
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Authorization approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorizationApproved'
+        '404':
+          description: Request not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/deny/{request_id}:
+    post:
+      tags: [Authorization]
+      summary: Deny authorization request
+      description: Deny a pending authorization request (wallet UI operation)
+      operationId: denyAuthorization
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorizationDenied'
+        '404':
+          description: Request not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/revoke:
+    post:
+      tags: [Authorization]
+      summary: Revoke authorization
+      description: Revoke current session authorization
+      operationId: revokeAuthorization
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Authorization revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: revoked
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /wallet/info:
+    get:
+      tags: [Wallet]
+      summary: Get wallet information
+      description: Get detailed wallet information
+      operationId: getWalletInfo
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Wallet information retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletInfo'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /wallet/unlock:
+    post:
+      tags: [Wallet]
+      summary: Unlock wallet
+      description: Unlock wallet with password
+      operationId: unlockWallet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnlockRequest'
+      responses:
+        '200':
+          description: Wallet unlocked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: unlocked
+        '401':
+          description: Invalid password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many failed attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /wallet/lock:
+    post:
+      tags: [Wallet]
+      summary: Lock wallet
+      description: Lock the wallet
+      operationId: lockWallet
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Wallet locked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: locked
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /balance/{contract}:
+    get:
+      tags: [Tokens]
+      summary: Get token balance
+      description: Get balance for a specific token contract
+      operationId: getBalance
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: contract
+          in: path
+          required: true
+          description: Token contract name (use 'currency' for native token)
+          schema:
+            type: string
+            example: currency
+      responses:
+        '200':
+          description: Balance retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Contract not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /balance/{contract}/{spender}:
+    get:
+      tags: [Tokens]
+      summary: Get approved balance
+      description: Get approved balance for a spender on a token contract
+      operationId: getApprovedBalance
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: contract
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: spender
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Approved balance retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovedBalanceResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /transaction:
+    post:
+      tags: [Transactions]
+      summary: Send transaction
+      description: Send a transaction to the blockchain
+      operationId: sendTransaction
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionRequest'
+      responses:
+        '200':
+          description: Transaction sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResult'
+        '400':
+          description: Invalid transaction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '423':
+          description: Wallet is locked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /sign:
+    post:
+      tags: [Transactions]
+      summary: Sign message
+      description: Sign a message with the wallet's private key
+      operationId: signMessage
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignMessageRequest'
+      responses:
+        '200':
+          description: Message signed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignatureResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '423':
+          description: Wallet is locked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /tokens/add:
+    post:
+      tags: [Tokens]
+      summary: Add custom token
+      description: Add a custom token to the wallet
+      operationId: addToken
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTokenRequest'
+      responses:
+        '200':
+          description: Token added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: added
+                  contract:
+                    type: string
+        '400':
+          description: Invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /tokens:
+    get:
+      tags: [Tokens]
+      summary: List tokens
+      description: List all tokens in the wallet
+      operationId: listTokens
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Tokens retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tokens:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TokenInfo'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Session token obtained from authorization flow
+
+  schemas:
+    WalletType:
+      type: string
+      enum: [desktop, web, cli, hardware, mobile]
+      description: Type of wallet implementation
+
+    Permission:
+      type: string
+      enum: [wallet_info, balance, transactions, sign_message, add_token]
+      description: Permission that can be granted to a DApp
+
+    WalletStatus:
+      type: object
+      required: [available, locked, wallet_type, version]
+      properties:
+        available:
+          type: boolean
+          description: Whether wallet is available
+        locked:
+          type: boolean
+          description: Whether wallet is locked
+        wallet_type:
+          $ref: '#/components/schemas/WalletType'
+        network:
+          type: string
+          description: Network URL
+          example: https://testnet.xian.org
+        chain_id:
+          type: string
+          description: Chain identifier
+          example: xian-testnet-1
+        version:
+          type: string
+          description: Protocol version
+          example: 2.0.0
+
+    AuthorizationRequest:
+      type: object
+      required: [app_name, app_url, permissions]
+      properties:
+        app_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Name of the requesting application
+          example: My DApp
+        app_url:
+          type: string
+          format: uri
+          description: URL of the requesting application
+          example: https://mydapp.example.com
+        permissions:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/Permission'
+          description: Requested permissions
+        description:
+          type: string
+          maxLength: 500
+          description: Optional description of why permissions are needed
+          example: Access needed to display balance and send transactions
+
+    AuthorizationPending:
+      type: object
+      required: [request_id, status, app_name]
+      properties:
+        request_id:
+          type: string
+          description: Unique request identifier
+        status:
+          type: string
+          enum: [pending]
+        app_name:
+          type: string
+        app_url:
+          type: string
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Permission'
+        description:
+          type: string
+
+    AuthorizationApproved:
+      type: object
+      required: [session_token, expires_at, permissions, status]
+      properties:
+        session_token:
+          type: string
+          description: Session token for authenticated requests
+        expires_at:
+          type: string
+          format: date-time
+          description: Token expiration time
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Permission'
+        status:
+          type: string
+          enum: [approved]
+
+    AuthorizationDenied:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [denied]
+        reason:
+          type: string
+          description: Optional reason for denial
+
+    WalletInfo:
+      type: object
+      required: [address, locked, wallet_type, version]
+      properties:
+        address:
+          type: string
+          description: Wallet address
+          example: "0x1234567890abcdef1234567890abcdef12345678"
+        truncated_address:
+          type: string
+          description: Truncated wallet address for display
+          example: "0x1234...5678"
+        locked:
+          type: boolean
+          description: Whether wallet is currently locked
+        chain_id:
+          type: string
+          description: Current chain ID
+        network:
+          type: string
+          description: Current network URL
+        wallet_type:
+          $ref: '#/components/schemas/WalletType'
+        version:
+          type: string
+          description: Wallet version
+
+    UnlockRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          format: password
+          description: Wallet password
+          minLength: 1
+
+    BalanceResponse:
+      type: object
+      required: [balance, contract]
+      properties:
+        balance:
+          type: number
+          description: Token balance
+          example: 1000.5
+        contract:
+          type: string
+          description: Token contract name
+          example: currency
+        symbol:
+          type: string
+          description: Token symbol
+          example: XIAN
+        decimals:
+          type: integer
+          description: Token decimals
+          example: 18
+
+    ApprovedBalanceResponse:
+      type: object
+      required: [approved_amount, contract, spender]
+      properties:
+        approved_amount:
+          type: number
+          description: Approved amount
+        contract:
+          type: string
+          description: Token contract
+        spender:
+          type: string
+          description: Spender address
+
+    TransactionRequest:
+      type: object
+      required: [contract, function, kwargs]
+      properties:
+        contract:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Smart contract name
+          example: currency
+        function:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Contract function to call
+          example: transfer
+        kwargs:
+          type: object
+          description: Function arguments
+          example:
+            to: "0xrecipient"
+            amount: 100
+        stamps_supplied:
+          type: integer
+          minimum: 0
+          description: Gas limit for transaction
+          example: 50000
+
+    TransactionResult:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          description: Whether transaction was successful
+        transaction_hash:
+          type: string
+          description: Transaction hash if successful
+          example: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+        result:
+          type: object
+          description: Transaction result data
+        errors:
+          type: array
+          items:
+            type: string
+          description: Error messages if failed
+        gas_used:
+          type: integer
+          description: Gas used by transaction
+
+    SignMessageRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          description: Message to sign
+          example: "Hello, Xian!"
+
+    SignatureResponse:
+      type: object
+      required: [signature, message, address]
+      properties:
+        signature:
+          type: string
+          description: Message signature
+          example: "0xsignature"
+        message:
+          type: string
+          description: Original message
+        address:
+          type: string
+          description: Signing address
+
+    AddTokenRequest:
+      type: object
+      required: [contract_address]
+      properties:
+        contract_address:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Token contract address
+        token_name:
+          type: string
+          maxLength: 100
+          description: Token name
+        token_symbol:
+          type: string
+          maxLength: 20
+          description: Token symbol
+        decimals:
+          type: integer
+          minimum: 0
+          maximum: 18
+          description: Token decimals
+
+    TokenInfo:
+      type: object
+      properties:
+        contract:
+          type: string
+          description: Token contract address
+        name:
+          type: string
+          description: Token name
+        symbol:
+          type: string
+          description: Token symbol
+        decimals:
+          type: integer
+          description: Token decimals
+        balance:
+          type: number
+          description: Current balance
+
+    Error:
+      type: object
+      required: [error, code]
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: string
+          description: Error code
+          enum:
+            - WALLET_LOCKED
+            - UNAUTHORIZED
+            - SESSION_EXPIRED
+            - INVALID_REQUEST
+            - NETWORK_ERROR
+            - INSUFFICIENT_BALANCE
+            - TRANSACTION_FAILED
+            - USER_REJECTED
+            - WALLET_NOT_FOUND
+            - INVALID_CONTRACT
+            - INVALID_SIGNATURE
+            - MAX_SESSIONS_EXCEEDED
+            - TOO_MANY_ATTEMPTS
+            - ACCOUNT_LOCKED
+        details:
+          type: string
+          description: Additional error details
+
+webhooks:
+  authorizationUpdate:
+    post:
+      requestBody:
+        description: Authorization status update
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [authorization_approved, authorization_denied, authorization_expired]
+                request_id:
+                  type: string
+                timestamp:
+                  type: string
+                  format: date-time
+      responses:
+        '200':
+          description: Webhook processed

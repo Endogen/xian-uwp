@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://xian.org/schemas/uwp/v2/responses/wallet-info",
+  "title": "Wallet Information Response",
+  "description": "Detailed wallet information",
+  "type": "object",
+  "required": ["address", "locked", "wallet_type", "version"],
+  "additionalProperties": false,
+  "properties": {
+    "address": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$",
+      "description": "Wallet address (64 character hex string)"
+    },
+    "truncated_address": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{8}\\.\\.\\.[a-fA-F0-9]{8}$",
+      "description": "Truncated address for display (e.g., '1234abcd...5678ef90')"
+    },
+    "locked": {
+      "type": "boolean",
+      "description": "Whether the wallet is currently locked"
+    },
+    "chain_id": {
+      "type": "string",
+      "description": "Current blockchain network chain ID"
+    },
+    "network": {
+      "type": "string",
+      "format": "uri",
+      "description": "Current network URL"
+    },
+    "wallet_type": {
+      "type": "string",
+      "enum": ["desktop", "web", "cli", "hardware", "mobile"],
+      "description": "Type of wallet implementation"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Wallet software version"
+    }
+  },
+  "examples": [
+    {
+      "address": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      "truncated_address": "12345678...90abcdef",
+      "locked": false,
+      "chain_id": "xian-testnet-1",
+      "network": "https://testnet.xian.org",
+      "wallet_type": "desktop",
+      "version": "1.0.0"
+    }
+  ]
+}

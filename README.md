@@ -1,102 +1,247 @@
 # Xian Universal Wallet Protocol
 
-## What Can Use Xian-UWP?
+[![Protocol Version](https://img.shields.io/badge/protocol-v2.0.0-blue)](protocol/SPECIFICATION.md)
+[![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0-green)](protocol/openapi.yaml)
+[![License](https://img.shields.io/badge/license-MIT-purple)](LICENSE)
 
-### 🔗 **Universal Compatibility Matrix**
+A language-agnostic protocol specification for wallet and DApp communication on the Xian blockchain.
 
-| Component | Technology | Location | Examples |
-|-----------|------------|----------|----------|
-| **Wallets** | Python | Local or Server | Desktop GUI, CLI daemon, Web wallet, Server wallet |
-| **DApps** | Any Language | Local or Server | React/Vue/Angular, Python/Flask, Node.js, Mobile apps, Desktop apps |
+## 🎯 Overview
 
-### 🌐 **Real-World Scenarios**
+The Xian Universal Wallet Protocol (UWP) defines a standard interface that enables any decentralized application (DApp) to communicate with any wallet implementation, regardless of the programming languages used by either party.
 
-✅ **Local Python wallet** ↔ **Local Python DApp**  
-✅ **Local Python wallet** ↔ **Server-hosted React DApp** (via CORS)  
-✅ **Server Python wallet** ↔ **Any DApp anywhere** (via HTTP API)  
-✅ **Local Python wallet** ↔ **Mobile app** (React Native, Flutter, native)  
-✅ **Local Python wallet** ↔ **Desktop app** (Electron, Tauri, native)  
+### Key Features
 
-### 🔑 **Key Benefits**
+- **🌐 Language Agnostic**: Implement in any programming language
+- **🔒 Secure by Design**: Permission-based access control with session management
+- **📡 Real-time Support**: Optional WebSocket for live updates
+- **🧪 Testable**: Comprehensive test vectors for compliance verification
+- **📚 Well Documented**: Complete OpenAPI specification and JSON schemas
 
-- **Language Independent**: DApps can use any programming language that supports HTTP
-- **Deployment Flexible**: Wallets and DApps can run locally or on servers
-- **Technology Agnostic**: Works with any web framework, mobile framework, or desktop technology
-- **Universal Interface**: Same API for all wallet types and DApp types
+## 🏗️ Repository Structure
 
-### ⚙️ **Technology Requirements**
+```
+xian-uwp/
+├── protocol/                 # Protocol Specification (Language Agnostic)
+│   ├── openapi.yaml         # OpenAPI 3.0 specification
+│   ├── SPECIFICATION.md     # Human-readable specification
+│   ├── schemas/             # JSON Schema definitions
+│   │   ├── requests/        # Request message schemas
+│   │   ├── responses/       # Response message schemas
+│   │   └── events/          # WebSocket event schemas
+│   └── test-vectors/        # Compliance test vectors
+│
+├── reference/               # Reference Implementations
+│   └── python/             # Python reference implementation
+│       ├── xian_uwp/       # Protocol implementation
+│       ├── pyproject.toml  # Package configuration
+│       └── README.md       # Implementation guide
+│
+├── docs/                    # Additional Documentation
+│   ├── IMPLEMENTATION.md   # Implementation guide
+│   └── COMPLIANCE.md       # Compliance testing guide
+│
+└── README.md               # This file
+```
 
-| Component | Requirements | Notes |
-|-----------|-------------|-------|
-| **Wallets** | Python 3.11+ | Must implement the protocol server |
-| **DApps** | HTTP client capability | Any language: Python, JavaScript, Go, Rust, Java, C#, etc. |
-| **Communication** | HTTP/JSON | Standard web protocols, CORS-enabled |
-
-## Overview
-
-The Xian Universal Wallet Protocol provides a **unified HTTP API interface** that enables any DApp to communicate with any Xian wallet type through a standardized protocol. This eliminates the need for DApp developers to implement wallet-specific integrations and allows wallets to work with any DApp that supports the protocol.
-
-**Core Principle**: Every wallet exposes the same HTTP API on `localhost:8545`, making wallet integration **programming language independent** and **wallet type agnostic**.
-
-> **Important**: The default port `8545` was chosen to avoid conflicts with common development servers. If this port is already in use on your system, you can configure a different port when initializing the server.
-
-## Quick Start
+## 🚀 Quick Start
 
 ### For DApp Developers
 
-```python
-# 1. Install the protocol
-pip install xian-uwp
+DApps can connect to any wallet implementing the protocol:
 
-# 2. Connect to any wallet
+```javascript
+// JavaScript/TypeScript
+const response = await fetch('http://localhost:8545/api/v1/auth/request', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    app_name: 'My DApp',
+    app_url: 'https://mydapp.com',
+    permissions: ['wallet_info', 'balance', 'transactions']
+  })
+});
+
+const { request_id } = await response.json();
+// Poll for authorization approval...
+```
+
+```python
+# Python
 from xian_uwp.client import XianWalletClientSync
 
-client = XianWalletClientSync("My DApp")
-client.connect()
-
-# 3. Use the wallet
-info = client.get_wallet_info()
-balance = client.get_balance("currency")
+client = XianWalletClientSync("My DApp", "https://mydapp.com")
+if client.connect():
+    balance = client.get_balance("currency")
+    print(f"Balance: {balance}")
 ```
 
 ### For Wallet Developers
 
-```python
-# 1. Install the protocol
-pip install xian-uwp
+Implement the protocol endpoints in your preferred language:
 
-# 2. Create protocol server
+```python
+# Python Reference Implementation
 from xian_uwp.server import WalletProtocolServer
 from xian_uwp.models import WalletType
 
 server = WalletProtocolServer(wallet_type=WalletType.DESKTOP)
-server.wallet = your_wallet_instance
-server.run()  # Starts on localhost:8545
+server.configure_network("https://testnet.xian.org", "xian-testnet-1")
+server.run(port=8545)
 ```
 
-## Universal Protocol Architecture
+For other languages, implement the endpoints defined in [`protocol/openapi.yaml`](protocol/openapi.yaml).
 
-### 🏗️ **High-Level Architecture**
+## 📋 Protocol Specification
 
-```
-┌─────────────────────────────────┐    HTTP API    ┌─────────────────────────────────┐
-│          Any DApp               │ ◄────────────► │         Any Wallet              │
-│                                 │                │                                 │
-│ • React/Vue/Angular (web)       │                │ • Desktop GUI (Python)          │
-│ • Python/Flask/Django (server)  │                │ • CLI daemon (Python)           │
-│ • Node.js/Express (server)      │                │ • Web wallet (Python)           │
-│ • Mobile (React Native/Flutter) │                │ • Server wallet (Python)        │
-│ • Desktop (Electron/Tauri)      │                │                                 │
-│ • Any language with HTTP        │                │ Exposes: localhost:8545         │
-└─────────────────────────────────┘                └─────────────────────────────────┘
+### Core Endpoints
+
+| Endpoint | Method | Description | Auth Required |
+|----------|--------|-------------|---------------|
+| `/api/v1/wallet/status` | GET | Check wallet availability | No |
+| `/api/v1/auth/request` | POST | Request authorization | No |
+| `/api/v1/auth/status/{id}` | GET | Check auth status | No |
+| `/api/v1/wallet/info` | GET | Get wallet information | Yes |
+| `/api/v1/transaction` | POST | Send transaction | Yes |
+| `/api/v1/balance/{contract}` | GET | Get token balance | Yes |
+| `/api/v1/sign` | POST | Sign message | Yes |
+
+### Authorization Flow
+
+```mermaid
+sequenceDiagram
+    participant DApp
+    participant Wallet
+    participant User
+
+    DApp->>Wallet: POST /auth/request
+    Wallet-->>DApp: 202 {request_id}
+    Wallet->>User: Show authorization prompt
+    User->>Wallet: Approve/Deny
+    DApp->>Wallet: GET /auth/status/{request_id}
+    Wallet-->>DApp: {session_token}
+    DApp->>Wallet: GET /wallet/info
+    Note over DApp,Wallet: Bearer {session_token}
+    Wallet-->>DApp: {wallet_info}
 ```
 
-### 🔄 **Communication Flow**
+### Permissions
 
+| Permission | Description |
+|------------|-------------|
+| `wallet_info` | Access wallet address and type |
+| `balance` | Read token balances |
+| `transactions` | Send transactions |
+| `sign_message` | Sign messages |
+| `add_token` | Add custom tokens |
+
+## 🧪 Compliance Testing
+
+Implementations must pass the protocol test vectors:
+
+```bash
+# Using the Python validator
+python protocol/validator.py --url http://localhost:8545
+
+# Manual testing with test vectors
+curl -X POST http://localhost:8545/api/v1/auth/request \
+  -H "Content-Type: application/json" \
+  -d @protocol/test-vectors/auth-flow.json
 ```
-DApp (Any Technology)  →  HTTP Request   →  Wallet (Python)
-                       ←  JSON Response  ←
+
+## 🛠️ Implementation Guide
+
+### Step 1: Review the Specification
+
+Read the [Protocol Specification](protocol/SPECIFICATION.md) to understand requirements.
+
+### Step 2: Use the OpenAPI Spec
+
+Generate server stubs or client SDKs from [`protocol/openapi.yaml`](protocol/openapi.yaml):
+
+```bash
+# Generate server stub (example with openapi-generator)
+openapi-generator generate -i protocol/openapi.yaml \
+  -g python-fastapi -o my-wallet-server
+
+# Generate client SDK
+openapi-generator generate -i protocol/openapi.yaml \
+  -g typescript-axios -o my-dapp-client
 ```
+
+### Step 3: Implement Required Endpoints
+
+At minimum, implement:
+1. `GET /api/v1/wallet/status`
+2. `POST /api/v1/auth/request`
+3. `GET /api/v1/auth/status/{request_id}`
+4. `GET /api/v1/wallet/info` (authenticated)
+5. `POST /api/v1/transaction` (authenticated)
+
+### Step 4: Validate Compliance
+
+Run test vectors against your implementation to ensure compatibility.
+
+## 📦 Available Implementations
+
+### Official Reference
+
+- **Python**: [`reference/python`](reference/python) - Full-featured reference implementation
+
+### Community Implementations
+
+*Coming soon:*
+- JavaScript/TypeScript
+- Rust
+- Go
+- C#/.NET
+
+Want to contribute an implementation? See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## 🔒 Security Considerations
+
+- **Use HTTPS in production** (HTTP only for local development)
+- **Implement rate limiting** for auth attempts and transactions
+- **Validate all inputs** according to JSON schemas
+- **Use secure session tokens** (minimum 256 bits entropy)
+- **Implement proper CORS** for web-based DApps
+
+## 📚 Resources
+
+- [Protocol Specification](protocol/SPECIFICATION.md) - Detailed protocol documentation
+- [OpenAPI Specification](protocol/openapi.yaml) - Machine-readable API definition
+- [JSON Schemas](protocol/schemas/) - Message format definitions
+- [Test Vectors](protocol/test-vectors/) - Compliance test cases
+- [Python Reference](reference/python/) - Reference implementation
+
+## 🤝 Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### Areas for Contribution
+
+- Additional language implementations
+- Protocol improvements (submit RFC)
+- Test vector additions
+- Documentation improvements
+- Security audits
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## 🔗 Links
+
+- [Xian Network](https://xian.org)
+- [GitHub Repository](https://github.com/xian-network/xian-uwp)
+- [Discord Community](https://discord.gg/xian)
+- [Protocol Discussion](https://github.com/xian-network/xian-uwp/discussions)
+
+---
+
+**Protocol Version**: 2.0.0  
+**Status**: Production Ready  
+**Last Updated**: 2024
 
 **Examples:**
 - React DApp on Vercel → CORS-enabled HTTP → Local Python wallet

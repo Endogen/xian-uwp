@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://xian.org/schemas/uwp/v2/responses/transaction-result",
+  "title": "Transaction Result",
+  "description": "Result of a transaction execution",
+  "type": "object",
+  "required": ["success"],
+  "additionalProperties": false,
+  "properties": {
+    "success": {
+      "type": "boolean",
+      "description": "Whether the transaction was successful"
+    },
+    "transaction_hash": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$",
+      "description": "Transaction hash if successful"
+    },
+    "result": {
+      "type": ["object", "string", "number", "boolean", "null"],
+      "description": "Transaction execution result"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Error messages if transaction failed"
+    },
+    "gas_used": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Amount of gas consumed by the transaction"
+    }
+  },
+  "examples": [
+    {
+      "success": true,
+      "transaction_hash": "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+      "result": {
+        "transferred": 100,
+        "new_balance": 900
+      },
+      "gas_used": 21000
+    },
+    {
+      "success": false,
+      "errors": ["Insufficient balance", "Amount must be greater than 0"]
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://xian.org/schemas/uwp/v2/events/websocket",
+  "title": "WebSocket Events",
+  "description": "Real-time events sent via WebSocket connection",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["type", "request_id", "timestamp"],
+      "properties": {
+        "type": {
+          "const": "authorization_request"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "app_name": {
+          "type": "string"
+        },
+        "app_url": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["type", "request_id", "status", "timestamp"],
+      "properties": {
+        "type": {
+          "const": "authorization_update"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["approved", "denied", "expired"]
+        },
+        "session_token": {
+          "type": "string",
+          "description": "Present only when status is 'approved'"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["type", "locked", "timestamp"],
+      "properties": {
+        "type": {
+          "const": "wallet_status_change"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["type", "transaction_hash", "status", "timestamp"],
+      "properties": {
+        "type": {
+          "const": "transaction_update"
+        },
+        "transaction_hash": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "confirmed", "failed"]
+        },
+        "confirmations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  ]
+}
