@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://xian.org/schemas/uwp/v2/requests/transaction",
+  "title": "Transaction Request",
+  "description": "Request to send a transaction to the blockchain",
+  "type": "object",
+  "required": ["contract", "function", "kwargs"],
+  "additionalProperties": false,
+  "properties": {
+    "contract": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+      "description": "Smart contract name"
+    },
+    "function": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+      "description": "Contract function to call"
+    },
+    "kwargs": {
+      "type": "object",
+      "description": "Function arguments as key-value pairs"
+    },
+    "stamps_supplied": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 999999999,
+      "description": "Gas limit for transaction (optional)"
+    }
+  },
+  "examples": [
+    {
+      "contract": "currency",
+      "function": "transfer",
+      "kwargs": {
+        "to": "recipient_address",
+        "amount": 100.5
+      },
+      "stamps_supplied": 50000
+    },
+    {
+      "contract": "dex",
+      "function": "swap",
+      "kwargs": {
+        "token_in": "currency",
+        "token_out": "my_token",
+        "amount_in": 100,
+        "min_amount_out": 95
+      }
+    }
+  ]
+}

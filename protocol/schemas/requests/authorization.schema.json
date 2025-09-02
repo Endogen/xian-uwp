@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://xian.org/schemas/uwp/v2/requests/authorization",
+  "title": "Authorization Request",
+  "description": "Request authorization from wallet for DApp access",
+  "type": "object",
+  "required": ["app_name", "app_url", "permissions"],
+  "additionalProperties": false,
+  "properties": {
+    "app_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Name of the requesting application"
+    },
+    "app_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://",
+      "description": "URL of the requesting application"
+    },
+    "permissions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["wallet_info", "balance", "transactions", "sign_message", "add_token"]
+      },
+      "description": "List of requested permissions"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Optional description of why permissions are needed"
+    }
+  },
+  "examples": [
+    {
+      "app_name": "Example DApp",
+      "app_url": "https://example-dapp.com",
+      "permissions": ["wallet_info", "balance", "transactions"],
+      "description": "Example DApp needs access to view your balance and send transactions"
+    }
+  ]
+}
