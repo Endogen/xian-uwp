@@ -53,6 +53,9 @@ class AuthorizationRequest(BaseModel):
     app_url: str = Field(..., min_length=1, max_length=500)
     permissions: List[Permission]
     description: Optional[str] = Field(None, max_length=500)
+    dapp_id: Optional[str] = Field(None, description="DApp identifier if registered")
+    signature: Optional[str] = Field(None, description="Signature for DApp verification")
+    timestamp: Optional[int] = Field(None, description="Unix timestamp for replay protection")
     
     @field_validator('app_url')
     @classmethod
@@ -153,10 +156,12 @@ class AuthorizationResponse(BaseModel):
     expires_at: datetime
     permissions: List[Permission]
     status: str = "approved"
+    refresh_token: Optional[str] = None
+    refresh_expires_at: Optional[datetime] = None
     
-    @field_serializer('expires_at')
-    def serialize_datetime(self, dt: datetime, _info):
-        return dt.isoformat()
+    @field_serializer('expires_at', 'refresh_expires_at')
+    def serialize_datetime(self, dt: Optional[datetime], _info):
+        return dt.isoformat() if dt else None
 
 
 class ErrorResponse(BaseModel):
@@ -187,6 +192,9 @@ class Session(BaseModel):
     expires_at: datetime
     last_activity: datetime
     request_id: Optional[str] = None
+    refresh_token: Optional[str] = None
+    dapp_id: Optional[str] = None
+    verified: bool = False
     
     @field_serializer('created_at', 'expires_at', 'last_activity')
     def serialize_datetime(self, dt: datetime, _info):
@@ -202,6 +210,8 @@ class PendingRequest(BaseModel):
     description: Optional[str]
     created_at: datetime
     status: str = "pending"
+    dapp_id: Optional[str] = None
+    signature_valid: Optional[bool] = None
     
     @field_serializer('created_at')
     def serialize_datetime(self, dt: datetime, _info):
@@ -311,6 +321,116 @@ class Endpoints:
     
     # WebSocket
     WEBSOCKET = "/ws/v1"
+
+
+# Refresh Token Models
+class RefreshTokenRequest(BaseModel):
+    """Refresh token request"""
+    refresh_token: str = Field(..., description="The refresh token")
+
+
+class RefreshTokenResponse(BaseModel):
+    """Refresh token response"""
+    session_token: str
+    expires_at: datetime
+    refresh_token: Optional[str] = None  # New refresh token if rotation enabled
+    refresh_expires_at: Optional[datetime] = None
+    
+    @field_serializer('expires_at', 'refresh_expires_at')
+    def serialize_datetime(self, dt: Optional[datetime], _info):
+        return dt.isoformat() if dt else None
+
+
+# DApp Registration Models
+class DAppAlgorithm(str, Enum):
+    """Supported signature algorithms"""
+    ED25519 = "ed25519"
+    ECDSA_SECP256K1 = "ecdsa-secp256k1"
+
+
+class DAppMetadata(BaseModel):
+    """DApp metadata"""
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    categories: Optional[List[str]] = None
+
+
+class DAppRegistration(BaseModel):
+    """DApp registration request"""
+    app_name: str = Field(..., min_length=1, max_length=100)
+    app_url: str = Field(..., min_length=1, max_length=500)
+    public_key: str = Field(..., description="Public key in base64 or hex format")
+    algorithm: DAppAlgorithm = DAppAlgorithm.ED25519
+    metadata: Optional[DAppMetadata] = None
+
+
+class DAppRegistrationResponse(BaseModel):
+    """DApp registration response"""
+    dapp_id: str
+    registered_at: datetime
+    challenge: Optional[str] = None
+    verification_required: Optional[bool] = None
+    
+    @field_serializer('registered_at')
+    def serialize_datetime(self, dt: datetime, _info):
+        return dt.isoformat()
+
+
+class DAppVerifyRequest(BaseModel):
+    """DApp signature verification request"""
+    dapp_id: str
+    message: str
+    signature: str
+
+
+class DAppInfo(BaseModel):
+    """DApp information"""
+    dapp_id: str
+    app_name: str
+    app_url: str
+    verified: bool
+    trust_level: str = "unverified"  # unverified, domain_verified, signature_verified, fully_verified
+    registered_at: Optional[datetime] = None
+    last_seen: Optional[datetime] = None
+    
+    @field_serializer('registered_at', 'last_seen')
+    def serialize_datetime(self, dt: Optional[datetime], _info):
+        return dt.isoformat() if dt else None
+
+
+# Internal Models for Refresh Tokens
+class RefreshToken(BaseModel):
+    """Internal refresh token model"""
+    token: str
+    session_token: str
+    app_name: str
+    app_url: str
+    permissions: List[Permission]
+    created_at: datetime
+    expires_at: datetime
+    last_used: Optional[datetime] = None
+    
+    @field_serializer('created_at', 'expires_at', 'last_used')
+    def serialize_datetime(self, dt: Optional[datetime], _info):
+        return dt.isoformat() if dt else None
+
+
+# Internal Models for DApp Registry
+class RegisteredDApp(BaseModel):
+    """Internal registered DApp model"""
+    dapp_id: str
+    app_name: str
+    app_url: str
+    public_key: str
+    algorithm: DAppAlgorithm
+    metadata: Optional[DAppMetadata] = None
+    registered_at: datetime
+    last_seen: Optional[datetime] = None
+    verified: bool = False
+    
+    @field_serializer('registered_at', 'last_seen')
+    def serialize_datetime(self, dt: Optional[datetime], _info):
+        return dt.isoformat() if dt else None
 
 
 # Error Codes

@@ -27,6 +27,9 @@ The Xian Universal Wallet Protocol (UWP) v2 defines a standardized, secure inter
 - **🚀 Multiple Transports**: HTTP, HTTPS, WebSocket, and gRPC support
 - **⚡ Enhanced Performance**: Optimized protocols for low-latency operations
 - **🎯 Deep Linking**: Native mobile app integration support
+- **🔑 WebSocket Authentication**: Secure WebSocket connections with Bearer token auth
+- **♻️ Refresh Tokens**: Long-lived sessions with automatic token rotation
+- **✅ DApp Verification**: Optional cryptographic DApp identity verification
 
 ## 🏗️ Repository Structure
 

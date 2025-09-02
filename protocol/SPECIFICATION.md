@@ -53,6 +53,8 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 - **Path**: `/ws/v1`
 - **Message Format**: JSON text frames
 - **Purpose**: Real-time event notifications
+- **Authentication**: REQUIRED - Bearer token via Authorization header or `token` query parameter
+- **Connection Lifecycle**: Connection automatically closed on token expiration or revocation
 
 ### 3.3 TLS/HTTPS Support (RECOMMENDED)
 
@@ -253,7 +255,92 @@ sequenceDiagram
 - Sessions MUST be revocable by the user
 - Implementations SHOULD limit the number of concurrent sessions
 
-### 6.3 Permissions
+### 6.3 Refresh Tokens (Optional)
+
+Wallets MAY implement refresh tokens for long-lived sessions:
+
+- **Purpose**: Allow DApps to renew sessions without re-authorization
+- **Lifetime**: Refresh tokens SHOULD have longer expiry than session tokens (e.g., 7-30 days)
+- **Rotation**: Implementations MAY rotate refresh tokens on each use
+- **Storage**: DApps MUST store refresh tokens securely
+- **Revocation**: Users MUST be able to revoke refresh tokens
+
+**Refresh Flow:**
+```json
+// Initial authorization response includes refresh token
+{
+  "session_token": "st_abc123...",
+  "refresh_token": "rt_xyz789...",  // Optional
+  "expires_at": "2024-01-01T12:00:00Z",
+  "refresh_expires_at": "2024-01-08T12:00:00Z"  // Optional
+}
+
+// Refresh request
+POST /api/v1/auth/refresh
+{
+  "refresh_token": "rt_xyz789..."
+}
+
+// Response with new tokens
+{
+  "session_token": "st_new456...",
+  "refresh_token": "rt_new012...",  // Optional if rotation enabled
+  "expires_at": "2024-01-01T13:00:00Z"
+}
+```
+
+### 6.4 DApp Identity Verification (Optional)
+
+Wallets MAY implement DApp identity verification for enhanced security:
+
+#### 6.4.1 DApp Registration
+
+DApps can register their identity with a wallet:
+
+```json
+POST /api/v1/dapp/register
+{
+  "app_name": "My DeFi App",
+  "app_url": "https://mydefi.app",
+  "public_key": "0x1234...",  // Ed25519 or ECDSA public key
+  "algorithm": "ed25519",
+  "metadata": {
+    "description": "Decentralized trading platform",
+    "icon": "https://mydefi.app/icon.png",
+    "categories": ["DeFi", "Trading"]
+  }
+}
+
+// Response
+{
+  "dapp_id": "dapp_1234567890",
+  "registered_at": "2024-01-01T12:00:00Z"
+}
+```
+
+#### 6.4.2 Signed Authorization Requests
+
+Registered DApps can sign their authorization requests:
+
+```json
+POST /api/v1/auth/request
+{
+  "app_name": "My DeFi App",
+  "app_url": "https://mydefi.app",
+  "permissions": ["wallet_info", "balance"],
+  "dapp_id": "dapp_1234567890",
+  "timestamp": 1234567890,
+  "signature": "0xabcd..."  // Sign(app_name + app_url + permissions + timestamp)
+}
+```
+
+Benefits:
+- Users see verified DApp identity
+- Protection against phishing
+- Request integrity verification
+- Replay attack prevention
+
+### 6.5 Permissions
 
 Permissions control what operations a DApp can perform:
 
