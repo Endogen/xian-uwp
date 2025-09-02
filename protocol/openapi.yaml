@@ -53,6 +53,8 @@ tags:
     description: Token management
   - name: Relay
     description: Relay server operations for mobile bridge
+  - name: WebSocket
+    description: Real-time event streaming via WebSocket
 
 paths:
   /wallet/status:
@@ -678,6 +680,228 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /auth/refresh:
+    post:
+      tags: [Authorization]
+      summary: Refresh session token
+      description: |
+        Use a refresh token to obtain a new session token without re-authorization.
+        This is an optional feature - wallets may choose not to implement refresh tokens.
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+                  description: The refresh token obtained during initial authorization
+                  example: "rt_1234567890abcdef"
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshTokenResponse'
+        '400':
+          description: Invalid refresh token format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '501':
+          description: Refresh tokens not supported by this wallet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/revoke-refresh:
+    post:
+      tags: [Authorization]
+      summary: Revoke refresh token
+      description: |
+        Revoke a refresh token to prevent it from being used to obtain new session tokens.
+        This is an optional feature - wallets may choose not to implement refresh tokens.
+      operationId: revokeRefreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+                  description: The refresh token to revoke
+                  example: "rt_1234567890abcdef"
+      responses:
+        '200':
+          description: Refresh token revoked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: revoked
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '501':
+          description: Refresh tokens not supported by this wallet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /dapp/register:
+    post:
+      tags: [Authorization]
+      summary: Register DApp identity (Optional)
+      description: |
+        Register a DApp with its public key for identity verification.
+        This is an optional protocol extension - wallets may choose not to implement DApp verification.
+        DApps that are not registered can still connect but may show warnings to users.
+      operationId: registerDApp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DAppRegistration'
+      responses:
+        '200':
+          description: DApp registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DAppRegistrationResponse'
+        '400':
+          description: Invalid registration data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: DApp already registered with different key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '501':
+          description: DApp registration not supported by this wallet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /dapp/verify:
+    post:
+      tags: [Authorization]
+      summary: Verify DApp signature (Optional)
+      description: |
+        Verify a DApp's signature to confirm its identity.
+        This is an optional protocol extension used internally by wallets that support DApp verification.
+      operationId: verifyDApp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - dapp_id
+                - message
+                - signature
+              properties:
+                dapp_id:
+                  type: string
+                  description: DApp identifier
+                message:
+                  type: string
+                  description: Message that was signed
+                signature:
+                  type: string
+                  description: Signature to verify
+      responses:
+        '200':
+          description: Signature verification result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                    description: Whether the signature is valid
+                  dapp_info:
+                    $ref: '#/components/schemas/DAppInfo'
+        '404':
+          description: DApp not registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '501':
+          description: DApp verification not supported
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /ws/v1:
+    get:
+      tags: [WebSocket]
+      summary: WebSocket connection for real-time events
+      description: |
+        Establishes WebSocket connection for receiving real-time authorization events.
+        Authentication is required via Bearer token in Authorization header or token query parameter.
+        The connection will be closed if the token expires or is revoked.
+      operationId: connectWebSocket
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Authorization
+          in: header
+          required: false
+          schema:
+            type: string
+            pattern: '^Bearer .+$'
+          description: Bearer token for authentication (preferred method)
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Session token for authentication (fallback for clients that cannot set headers)
+      responses:
+        '101':
+          description: Switching Protocols - WebSocket connection established
+        '401':
+          description: Unauthorized - Missing or invalid authentication token
+        '403':
+          description: Forbidden - Token lacks required permissions
+        '400':
+          description: Bad Request
+
 components:
   securitySchemes:
     bearerAuth:
@@ -874,6 +1098,17 @@ components:
           maxLength: 500
           description: Optional description of why permissions are needed
           example: Access needed to display balance and send transactions
+        dapp_id:
+          type: string
+          description: Optional DApp identifier if registered
+          example: "dapp_1234567890"
+        signature:
+          type: string
+          description: Optional signature of the request for DApp verification
+        timestamp:
+          type: integer
+          description: Optional Unix timestamp for replay protection (required if signature is provided)
+          example: 1234567890
 
     AuthorizationPending:
       type: object
@@ -903,10 +1138,17 @@ components:
         session_token:
           type: string
           description: Session token for authenticated requests
+        refresh_token:
+          type: string
+          description: Optional refresh token for renewing sessions (if supported by wallet)
         expires_at:
           type: string
           format: date-time
           description: Token expiration time
+        refresh_expires_at:
+          type: string
+          format: date-time
+          description: Refresh token expiration time (if refresh_token is provided)
         permissions:
           type: array
           items:
@@ -1145,6 +1387,112 @@ components:
         details:
           type: string
           description: Additional error details
+
+    RefreshTokenResponse:
+      type: object
+      required: [session_token, expires_at]
+      properties:
+        session_token:
+          type: string
+          description: New session token
+        refresh_token:
+          type: string
+          description: New refresh token (if rotation is enabled)
+        expires_at:
+          type: string
+          format: date-time
+          description: Session token expiration time
+        refresh_expires_at:
+          type: string
+          format: date-time
+          description: Refresh token expiration time (if rotation is enabled)
+
+    DAppRegistration:
+      type: object
+      required: [app_name, app_url, public_key]
+      properties:
+        app_name:
+          type: string
+          description: DApp display name
+          example: "My DeFi App"
+        app_url:
+          type: string
+          format: uri
+          description: DApp URL
+          example: "https://mydefi.app"
+        public_key:
+          type: string
+          description: DApp's public key (Ed25519 or ECDSA) in base64 or hex format
+          example: "0x1234567890abcdef..."
+        algorithm:
+          type: string
+          enum: [ed25519, ecdsa-secp256k1]
+          default: ed25519
+          description: Signature algorithm used by the DApp
+        metadata:
+          type: object
+          properties:
+            description:
+              type: string
+              description: DApp description
+            icon:
+              type: string
+              format: uri
+              description: DApp icon URL
+            categories:
+              type: array
+              items:
+                type: string
+              description: DApp categories (e.g., DeFi, Gaming, NFT)
+
+    DAppRegistrationResponse:
+      type: object
+      required: [dapp_id, registered_at]
+      properties:
+        dapp_id:
+          type: string
+          description: Unique identifier for the registered DApp
+          example: "dapp_1234567890"
+        challenge:
+          type: string
+          description: Optional challenge for initial verification
+        registered_at:
+          type: string
+          format: date-time
+          description: Registration timestamp
+        verification_required:
+          type: boolean
+          description: Whether the DApp needs to complete verification
+
+    DAppInfo:
+      type: object
+      required: [dapp_id, app_name, app_url, verified]
+      properties:
+        dapp_id:
+          type: string
+          description: DApp identifier
+        app_name:
+          type: string
+          description: DApp display name
+        app_url:
+          type: string
+          format: uri
+          description: DApp URL
+        verified:
+          type: boolean
+          description: Whether the DApp identity is verified
+        trust_level:
+          type: string
+          enum: [unverified, domain_verified, signature_verified, fully_verified]
+          description: DApp trust level
+        registered_at:
+          type: string
+          format: date-time
+          description: When the DApp was registered
+        last_seen:
+          type: string
+          format: date-time
+          description: Last activity from this DApp
 
 webhooks:
   authorizationUpdate:

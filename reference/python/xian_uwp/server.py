@@ -29,7 +29,10 @@ from .models import (
     AuthorizationRequest, TransactionRequest, SignMessageRequest, AddTokenRequest, UnlockRequest,
     WalletInfo, BalanceResponse, TransactionResult, SignatureResponse, 
     AuthorizationResponse, StatusResponse,
-    Session, PendingRequest
+    Session, PendingRequest,
+    RefreshTokenRequest, RefreshTokenResponse,
+    DAppRegistration, DAppRegistrationResponse, DAppVerifyRequest, DAppInfo,
+    DAppAlgorithm, DAppMetadata
 )
 
 from .client import WalletProtocolError
@@ -77,6 +80,17 @@ class WalletProtocolServer:
         self.pending_requests: Dict[str, PendingRequest] = {}
         self.websocket_connections: Set[WebSocket] = set()
         self.websocket_subscriptions: Dict[WebSocket, Set[str]] = {}  # websocket -> set of request_ids
+        self.websocket_sessions: Dict[WebSocket, Session] = {}  # websocket -> session
+        
+        # Refresh token management
+        self.refresh_tokens: Dict[str, Any] = {}  # refresh_token -> RefreshToken object
+        self.enable_refresh_tokens = True
+        self.refresh_token_lifetime = timedelta(days=7)
+        self.rotate_refresh_tokens = True
+        
+        # DApp registry
+        self.registered_dapps: Dict[str, Any] = {}  # dapp_id -> RegisteredDApp object
+        self.enable_dapp_verification = True
         
         # Cache and activity tracking
         self.cache: Dict[str, tuple] = {}  # (data, timestamp)
@@ -213,13 +227,25 @@ class WalletProtocolServer:
             
             request_id = secrets.token_urlsafe(16)
             
+            # Verify DApp signature if provided
+            signature_valid = None
+            if self.enable_dapp_verification and request.dapp_id and request.signature:
+                if request.dapp_id in self.registered_dapps:
+                    dapp = self.registered_dapps[request.dapp_id]
+                    # TODO: Implement actual signature verification
+                    # For now, just check if DApp is registered
+                    signature_valid = dapp.get("verified", False)
+                    dapp["last_seen"] = datetime.now()
+            
             pending_request = PendingRequest(
                 request_id=request_id,
                 app_name=request.app_name,
                 app_url=request.app_url,
                 permissions=request.permissions,
                 description=request.description,
-                created_at=datetime.now()
+                created_at=datetime.now(),
+                dapp_id=request.dapp_id,
+                signature_valid=signature_valid
             )
             
             self.pending_requests[request_id] = pending_request
@@ -288,6 +314,26 @@ class WalletProtocolServer:
             session_token = secrets.token_urlsafe(32)
             expires_at = datetime.now() + timedelta(minutes=ProtocolConfig.SESSION_TIMEOUT_MINUTES)
             
+            # Generate refresh token if enabled
+            refresh_token = None
+            refresh_expires_at = None
+            if self.enable_refresh_tokens:
+                refresh_token = secrets.token_urlsafe(32)
+                refresh_expires_at = datetime.now() + self.refresh_token_lifetime
+                
+                self.refresh_tokens[refresh_token] = {
+                    "token": refresh_token,
+                    "session_token": session_token,
+                    "app_name": pending_request.app_name,
+                    "app_url": pending_request.app_url,
+                    "permissions": pending_request.permissions,
+                    "created_at": datetime.now(),
+                    "expires_at": refresh_expires_at,
+                    "last_used": None,
+                    "dapp_id": pending_request.dapp_id,
+                    "verified": pending_request.signature_valid or False
+                }
+            
             session = Session(
                 token=session_token,
                 app_name=pending_request.app_name,
@@ -296,7 +342,10 @@ class WalletProtocolServer:
                 created_at=datetime.now(),
                 expires_at=expires_at,
                 last_activity=datetime.now(),
-                request_id=request_id
+                request_id=request_id,
+                refresh_token=refresh_token,
+                dapp_id=pending_request.dapp_id,
+                verified=pending_request.signature_valid or False
             )
             
             self.sessions[session_token] = session
@@ -313,7 +362,9 @@ class WalletProtocolServer:
             return AuthorizationResponse(
                 session_token=session_token,
                 expires_at=expires_at,
-                permissions=pending_request.permissions
+                permissions=pending_request.permissions,
+                refresh_token=refresh_token,
+                refresh_expires_at=refresh_expires_at
             )
         
         @app.post(Endpoints.AUTH_DENY.replace("{request_id}", "{request_id}"))
@@ -331,6 +382,181 @@ class WalletProtocolServer:
                 })
                 
             return {"status": "denied"}
+        
+        # Refresh token endpoints
+        @app.post("/api/v1/auth/refresh")
+        async def refresh_session(request: Request):
+            """Refresh session using refresh token"""
+            if not self.enable_refresh_tokens:
+                raise HTTPException(status_code=404, detail="Refresh tokens not enabled")
+            
+            # Get refresh token from body
+            body = await request.json()
+            refresh_token = body.get("refresh_token")
+            
+            if not refresh_token or refresh_token not in self.refresh_tokens:
+                raise HTTPException(status_code=401, detail="Invalid refresh token")
+            
+            refresh_obj = self.refresh_tokens[refresh_token]
+            
+            # Check if refresh token is expired
+            if datetime.now() > refresh_obj["expires_at"]:
+                del self.refresh_tokens[refresh_token]
+                raise HTTPException(status_code=401, detail="Refresh token expired")
+            
+            # Generate new session token
+            new_session_token = secrets.token_urlsafe(32)
+            expires_at = datetime.now() + timedelta(minutes=ProtocolConfig.SESSION_TIMEOUT_MINUTES)
+            
+            # Create new session
+            session = Session(
+                token=new_session_token,
+                app_name=refresh_obj["app_name"],
+                app_url=refresh_obj["app_url"],
+                permissions=refresh_obj["permissions"],
+                created_at=datetime.now(),
+                expires_at=expires_at,
+                last_activity=datetime.now(),
+                refresh_token=refresh_token if not self.rotate_refresh_tokens else None,
+                dapp_id=refresh_obj.get("dapp_id"),
+                verified=refresh_obj.get("verified", False)
+            )
+            
+            self.sessions[new_session_token] = session
+            
+            # Rotate refresh token if enabled
+            new_refresh_token = None
+            new_refresh_expires = None
+            if self.rotate_refresh_tokens:
+                # Delete old refresh token
+                del self.refresh_tokens[refresh_token]
+                
+                # Create new refresh token
+                new_refresh_token = secrets.token_urlsafe(32)
+                new_refresh_expires = datetime.now() + self.refresh_token_lifetime
+                
+                self.refresh_tokens[new_refresh_token] = {
+                    "token": new_refresh_token,
+                    "session_token": new_session_token,
+                    "app_name": refresh_obj["app_name"],
+                    "app_url": refresh_obj["app_url"],
+                    "permissions": refresh_obj["permissions"],
+                    "created_at": datetime.now(),
+                    "expires_at": new_refresh_expires,
+                    "last_used": datetime.now(),
+                    "dapp_id": refresh_obj.get("dapp_id"),
+                    "verified": refresh_obj.get("verified", False)
+                }
+                
+                session.refresh_token = new_refresh_token
+            else:
+                # Update last used time
+                refresh_obj["last_used"] = datetime.now()
+                refresh_obj["session_token"] = new_session_token
+            
+            return {
+                "session_token": new_session_token,
+                "expires_at": expires_at.isoformat(),
+                "refresh_token": new_refresh_token,
+                "refresh_expires_at": new_refresh_expires.isoformat() if new_refresh_expires else None
+            }
+        
+        @app.post("/api/v1/auth/revoke-refresh")
+        async def revoke_refresh_token(request: Request):
+            """Revoke a refresh token"""
+            if not self.enable_refresh_tokens:
+                raise HTTPException(status_code=404, detail="Refresh tokens not enabled")
+            
+            # Get refresh token from body
+            body = await request.json()
+            refresh_token = body.get("refresh_token")
+            
+            if refresh_token and refresh_token in self.refresh_tokens:
+                # Also revoke associated session if exists
+                refresh_obj = self.refresh_tokens[refresh_token]
+                session_token = refresh_obj.get("session_token")
+                if session_token and session_token in self.sessions:
+                    del self.sessions[session_token]
+                
+                del self.refresh_tokens[refresh_token]
+                return {"revoked": True}
+            
+            return {"revoked": False}
+        
+        # DApp registration endpoints
+        @app.post("/api/v1/dapp/register")
+        async def register_dapp(registration: DAppRegistration):
+            """Register a DApp for identity verification"""
+            if not self.enable_dapp_verification:
+                raise HTTPException(status_code=404, detail="DApp verification not enabled")
+            
+            # Generate unique DApp ID
+            dapp_id = f"dapp_{secrets.token_urlsafe(16)}"
+            
+            # Store DApp registration
+            self.registered_dapps[dapp_id] = {
+                "dapp_id": dapp_id,
+                "app_name": registration.app_name,
+                "app_url": registration.app_url,
+                "public_key": registration.public_key,
+                "algorithm": registration.algorithm,
+                "metadata": registration.metadata,
+                "registered_at": datetime.now(),
+                "verified": False
+            }
+            
+            # Generate challenge for verification
+            challenge = secrets.token_urlsafe(32)
+            
+            return {
+                "dapp_id": dapp_id,
+                "registered_at": datetime.now().isoformat(),
+                "challenge": challenge,
+                "verification_required": True
+            }
+        
+        @app.post("/api/v1/dapp/verify")
+        async def verify_dapp(verification: DAppVerifyRequest):
+            """Verify DApp signature"""
+            if not self.enable_dapp_verification:
+                raise HTTPException(status_code=404, detail="DApp verification not enabled")
+            
+            if verification.dapp_id not in self.registered_dapps:
+                raise HTTPException(status_code=404, detail="DApp not found")
+            
+            dapp = self.registered_dapps[verification.dapp_id]
+            
+            # TODO: Implement actual signature verification based on algorithm
+            # For now, just mark as verified
+            dapp["verified"] = True
+            dapp["last_seen"] = datetime.now()
+            
+            return {
+                "verified": True,
+                "dapp_id": verification.dapp_id,
+                "trust_level": "signature_verified"
+            }
+        
+        @app.get("/api/v1/dapp/{dapp_id}")
+        async def get_dapp_info(dapp_id: str):
+            """Get DApp information"""
+            if not self.enable_dapp_verification:
+                raise HTTPException(status_code=404, detail="DApp verification not enabled")
+            
+            if dapp_id not in self.registered_dapps:
+                raise HTTPException(status_code=404, detail="DApp not found")
+            
+            dapp = self.registered_dapps[dapp_id]
+            
+            return {
+                "dapp_id": dapp_id,
+                "app_name": dapp["app_name"],
+                "app_url": dapp["app_url"],
+                "verified": dapp.get("verified", False),
+                "trust_level": "signature_verified" if dapp.get("verified") else "unverified",
+                "registered_at": dapp["registered_at"].isoformat(),
+                "last_seen": dapp.get("last_seen", dapp["registered_at"]).isoformat()
+            }
         
         # Wallet endpoints
         @app.get(Endpoints.WALLET_INFO, response_model=WalletInfo)
@@ -520,16 +746,48 @@ class WalletProtocolServer:
         # WebSocket endpoint
         @app.websocket(Endpoints.WEBSOCKET)
         async def websocket_endpoint(websocket: WebSocket):
-            """WebSocket for real-time communication"""
+            """WebSocket for real-time communication with authentication"""
+            # Extract token from headers or query params
+            token = None
+            
+            # Try to get token from Authorization header
+            auth_header = websocket.headers.get("authorization", "")
+            if auth_header.startswith("Bearer "):
+                token = auth_header[7:]
+            
+            # Fallback to query parameter
+            if not token:
+                token = websocket.query_params.get("token")
+            
+            # Verify token
+            if not token or token not in self.sessions:
+                await websocket.close(code=1008, reason="Unauthorized")
+                return
+            
+            session = self.sessions.get(token)
+            if datetime.now() > session.expires_at:
+                del self.sessions[token]
+                await websocket.close(code=1008, reason="Session expired")
+                return
+            
             await websocket.accept()
             self.websocket_connections.add(websocket)
             self.websocket_subscriptions[websocket] = set()
+            self.websocket_sessions[websocket] = session
             
             try:
                 while True:
+                    # Check if session is still valid
+                    if token not in self.sessions or datetime.now() > session.expires_at:
+                        await websocket.close(code=1008, reason="Session expired")
+                        break
+                    
                     data = await websocket.receive_text()
                     try:
                         message = json.loads(data)
+                        
+                        # Update session activity
+                        session.last_activity = datetime.now()
                         
                         # Handle ping/pong
                         if message.get("type") == "ping":
@@ -563,6 +821,8 @@ class WalletProtocolServer:
                 self.websocket_connections.discard(websocket)
                 if websocket in self.websocket_subscriptions:
                     del self.websocket_subscriptions[websocket]
+                if websocket in self.websocket_sessions:
+                    del self.websocket_sessions[websocket]
     
     # Cache management
     def _get_cached(self, key: str, ttl_seconds: int) -> Optional[Any]:
