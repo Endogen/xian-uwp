@@ -19,6 +19,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from xian_py.wallet import Wallet
 from xian_py.xian_async import XianAsync
@@ -53,7 +55,8 @@ class WalletProtocolServer:
         cors_config: Optional[CORSConfig] = None,
         network_url: Optional[str] = None,
         chain_id: Optional[str] = None,
-        wallet: Optional[Wallet] = None
+        wallet: Optional[Wallet] = None,
+        auto_approve: bool = False  # Add auto-approval for testing
     ):
         self.wallet_type = wallet_type
         self.uvicorn_server = None
@@ -64,6 +67,7 @@ class WalletProtocolServer:
         self.is_locked = True
         self.password_hash: Optional[str] = None
         self.password_hasher = PasswordHasher()
+        self.auto_approve = auto_approve  # Store auto-approval setting
         
         # Robust server management
         self.server_manager: Optional[RobustServerManager] = None
@@ -159,6 +163,56 @@ class WalletProtocolServer:
             max_age=self.cors_config.max_age,
         )
         
+        # Custom exception handler for validation errors (return 400 instead of 422)
+        @app.exception_handler(RequestValidationError)
+        async def validation_exception_handler(request: Request, exc: RequestValidationError):
+            errors = []
+            for error in exc.errors():
+                field = ".".join(str(loc) for loc in error["loc"] if loc != "body")
+                errors.append({
+                    "field": field,
+                    "message": error["msg"],
+                    "type": error["type"]
+                })
+            
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": "Validation error",
+                    "code": ErrorCodes.INVALID_REQUEST,
+                    "details": errors
+                }
+            )
+        
+        # Custom exception handler for HTTPException to ensure proper error format
+        @app.exception_handler(HTTPException)
+        async def http_exception_handler(request: Request, exc: HTTPException):
+            # Map detail to appropriate error code
+            error_code = exc.detail if exc.detail in [
+                ErrorCodes.INVALID_REQUEST,
+                ErrorCodes.UNAUTHORIZED,
+                ErrorCodes.SESSION_EXPIRED,
+                ErrorCodes.WALLET_LOCKED,
+                ErrorCodes.WALLET_NOT_FOUND,
+                ErrorCodes.INSUFFICIENT_BALANCE,
+                ErrorCodes.TRANSACTION_FAILED,
+                ErrorCodes.NETWORK_ERROR,
+                ErrorCodes.USER_REJECTED,
+                ErrorCodes.INVALID_CONTRACT,
+                ErrorCodes.INVALID_SIGNATURE,
+                ErrorCodes.MAX_SESSIONS_EXCEEDED,
+                ErrorCodes.TOO_MANY_ATTEMPTS,
+                ErrorCodes.ACCOUNT_LOCKED
+            ] else "ERROR"
+            
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={
+                    "error": str(exc.detail),
+                    "code": error_code
+                }
+            )
+        
         # Register routes
         self._register_routes(app)
         
@@ -215,7 +269,7 @@ class WalletProtocolServer:
             )
         
         # Authorization endpoints
-        @app.post(Endpoints.AUTH_REQUEST)
+        @app.post(Endpoints.AUTH_REQUEST, status_code=202)
         async def request_authorization(request: AuthorizationRequest):
             """Request DApp authorization"""
             # Enforce MAX_SESSIONS limit on pending requests
@@ -250,6 +304,72 @@ class WalletProtocolServer:
             
             self.pending_requests[request_id] = pending_request
             
+            # Auto-approve if enabled (for testing)
+            if self.auto_approve:
+                # Create session immediately
+                session_token = secrets.token_urlsafe(32)
+                expires_at = datetime.now() + timedelta(minutes=ProtocolConfig.SESSION_TIMEOUT_MINUTES)
+                
+                # Generate refresh token if enabled
+                refresh_token = None
+                refresh_expires_at = None
+                if self.enable_refresh_tokens:
+                    refresh_token = secrets.token_urlsafe(32)
+                    refresh_expires_at = datetime.now() + self.refresh_token_lifetime
+                    
+                    self.refresh_tokens[refresh_token] = {
+                        "token": refresh_token,
+                        "session_token": session_token,
+                        "app_name": pending_request.app_name,
+                        "app_url": pending_request.app_url,
+                        "permissions": pending_request.permissions,
+                        "created_at": datetime.now(),
+                        "expires_at": refresh_expires_at,
+                        "last_used": None,
+                        "dapp_id": pending_request.dapp_id,
+                        "verified": pending_request.signature_valid or False
+                    }
+                
+                session = Session(
+                    token=session_token,
+                    app_name=pending_request.app_name,
+                    app_url=pending_request.app_url,
+                    permissions=pending_request.permissions,
+                    created_at=datetime.now(),
+                    expires_at=expires_at,
+                    last_activity=datetime.now(),
+                    request_id=request_id,
+                    refresh_token=refresh_token,
+                    dapp_id=pending_request.dapp_id,
+                    verified=pending_request.signature_valid or False
+                )
+                
+                self.sessions[session_token] = session
+                
+                # Mark as approved immediately
+                pending_request.status = "approved"
+                
+                # Still notify via WebSocket for consistency
+                await self._broadcast_to_wallet({
+                    "type": "authorization_auto_approved",
+                    "request_id": request_id,
+                    "session_token": session_token,
+                    "app_name": pending_request.app_name
+                })
+                
+                # Return with session info (still 202 as it's async conceptually)
+                return {
+                    "request_id": request_id,
+                    "status": "approved",
+                    "app_name": request.app_name,
+                    "session_token": session_token,
+                    "expires_at": expires_at.isoformat(),
+                    "permissions": pending_request.permissions,
+                    "refresh_token": refresh_token,
+                    "refresh_expires_at": refresh_expires_at.isoformat() if refresh_expires_at else None
+                }
+            
+            # Normal flow - manual approval required
             # Notify wallet UI via WebSocket
             await self._broadcast_to_wallet({
                 "type": "authorization_request",
