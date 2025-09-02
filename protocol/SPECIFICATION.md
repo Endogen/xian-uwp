@@ -447,6 +447,70 @@ Implementations MAY define additional permissions with `x_` prefix:
 - [JSON Schema](https://json-schema.org/) - JSON Schema Specification
 - [OpenAPI 3.0](https://swagger.io/specification/) - OpenAPI Specification
 
+## 8. WebSocket Support (Optional)
+
+Implementations MAY provide WebSocket support for real-time updates as an enhancement to the HTTP polling mechanism.
+
+### 8.1 WebSocket Endpoint
+
+- **URL**: `ws://[host]:[port]/ws/v1`
+- **Protocol**: WebSocket (RFC 6455)
+- **Authentication**: Not required for connection, but subscriptions may require valid request_id
+
+### 8.2 Message Format
+
+All WebSocket messages MUST be JSON-encoded text frames.
+
+#### Client to Server Messages
+
+```json
+{
+  "type": "subscribe",
+  "request_id": "string"  // Subscribe to authorization updates
+}
+
+{
+  "type": "unsubscribe",
+  "request_id": "string"  // Unsubscribe from updates
+}
+
+{
+  "type": "ping"  // Heartbeat
+}
+```
+
+#### Server to Client Messages
+
+```json
+{
+  "type": "authorization_approved",
+  "request_id": "string",
+  "session_token": "string",
+  "timestamp": "ISO8601"
+}
+
+{
+  "type": "authorization_denied",
+  "request_id": "string",
+  "reason": "string",
+  "timestamp": "ISO8601"
+}
+
+{
+  "type": "pong"  // Heartbeat response
+}
+```
+
+### 8.3 Connection Management
+
+- Implementations SHOULD send ping/pong frames every 30 seconds
+- Clients SHOULD implement automatic reconnection with exponential backoff
+- Servers MAY limit the number of concurrent WebSocket connections per client
+
+### 8.4 Graceful Degradation
+
+DApps MUST NOT require WebSocket support. The HTTP polling mechanism MUST always be available as a fallback.
+
 ## Appendix A: Example Implementation Flow
 
 ```python
