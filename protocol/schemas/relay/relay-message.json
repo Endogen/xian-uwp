@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://xian.org/schemas/uwp/v2/relay/relay-message.json",
+  "title": "Relay Message",
+  "description": "Encrypted message for relay between DApp and wallet",
+  "type": "object",
+  "required": ["session_id", "encrypted_payload", "from"],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9-_]{16,64}$",
+      "description": "Session identifier for message routing"
+    },
+    "from": {
+      "type": "string",
+      "enum": ["dapp", "wallet"],
+      "description": "Message sender type"
+    },
+    "to": {
+      "type": "string",
+      "enum": ["dapp", "wallet"],
+      "description": "Message recipient type"
+    },
+    "encrypted_payload": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]+=*$",
+      "description": "Base64 encoded encrypted message payload"
+    },
+    "message_type": {
+      "type": "string",
+      "enum": [
+        "auth_request",
+        "auth_response",
+        "transaction_request",
+        "transaction_response",
+        "sign_request",
+        "sign_response",
+        "heartbeat",
+        "error"
+      ],
+      "description": "Type of message (visible to relay for routing)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Message timestamp"
+    },
+    "nonce": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]{16,32}=$",
+      "description": "Base64 encoded nonce for replay protection"
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]+=*$",
+      "description": "Base64 encoded message signature"
+    }
+  }
+}

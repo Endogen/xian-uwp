@@ -1,57 +1,73 @@
-# Xian Universal Wallet Protocol
+# Xian Universal Wallet Protocol (UWP)
 
 [![Protocol Version](https://img.shields.io/badge/protocol-v2.0.0-blue)](protocol/SPECIFICATION.md)
 [![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0-green)](protocol/openapi.yaml)
+[![gRPC](https://img.shields.io/badge/gRPC-supported-brightgreen)](protocol/grpc/wallet.proto)
 [![License](https://img.shields.io/badge/license-MIT-purple)](LICENSE)
 
-A language-agnostic protocol specification for wallet and DApp communication on the Xian blockchain.
+A comprehensive, language-agnostic protocol specification for secure wallet and DApp communication on the Xian blockchain, featuring advanced discovery, mobile support, and multiple transport options.
 
 ## 🎯 Overview
 
-The Xian Universal Wallet Protocol (UWP) defines a standard interface that enables any decentralized application (DApp) to communicate with any wallet implementation, regardless of the programming languages used by either party.
+The Xian Universal Wallet Protocol (UWP) v2 defines a standardized, secure interface that enables seamless communication between decentralized applications (DApps) and wallet implementations across any platform or programming language.
 
-### Key Features
+### ✨ Key Features
 
-- **🌐 Language Agnostic**: Implement in any programming language
-- **🔒 Secure by Design**: Permission-based access control with session management
-- **📡 Real-time Support**: Optional WebSocket for live updates
-- **🧪 Testable**: Comprehensive test vectors for compliance verification
-- **📚 Well Documented**: Complete OpenAPI specification and JSON schemas
+#### Core Capabilities
+- **🌐 Language Agnostic**: RESTful HTTP API implementable in any language
+- **🔒 Security First**: Permission-based access control with session management
+- **🔐 E2E Encryption**: End-to-end encryption for relay communications
+- **📡 Real-time Updates**: Optional WebSocket support for live events
+- **🧪 Compliance Testing**: Comprehensive test vectors for verification
+
+#### Advanced Features (v2)
+- **🔍 Wallet Discovery**: Automatic wallet detection via mDNS, registry, or browser
+- **📱 Mobile Bridge**: Relay server support for mobile wallet connectivity
+- **🔗 QR Code Pairing**: Seamless mobile wallet connection via QR codes
+- **🚀 Multiple Transports**: HTTP, HTTPS, WebSocket, and gRPC support
+- **⚡ Enhanced Performance**: Optimized protocols for low-latency operations
+- **🎯 Deep Linking**: Native mobile app integration support
 
 ## 🏗️ Repository Structure
 
 ```
 xian-uwp/
-├── protocol/                 # Protocol Specification (Language Agnostic)
+├── protocol/                 # Protocol Specifications
+│   ├── SPECIFICATION.md     # Complete protocol specification v2
 │   ├── openapi.yaml         # OpenAPI 3.0 specification
-│   ├── SPECIFICATION.md     # Human-readable specification
-│   ├── schemas/             # JSON Schema definitions
-│   │   ├── requests/        # Request message schemas
-│   │   ├── responses/       # Response message schemas
-│   │   └── events/          # WebSocket event schemas
-│   └── test-vectors/        # Compliance test vectors
+│   ├── grpc/               # gRPC Protocol Definitions
+│   │   └── wallet.proto    # Protocol buffer definitions
+│   ├── schemas/            # JSON Schema Definitions
+│   │   ├── discovery/      # Wallet discovery schemas
+│   │   ├── pairing/        # QR/Deep link pairing schemas
+│   │   ├── relay/          # Relay message schemas
+│   │   ├── requests/       # Request message schemas
+│   │   ├── responses/      # Response message schemas
+│   │   └── events/         # WebSocket event schemas
+│   └── test-vectors/       # Compliance test vectors
 │
-├── reference/               # Reference Implementations
-│   └── python/             # Python reference implementation
-│       ├── xian_uwp/       # Protocol implementation
-│       ├── pyproject.toml  # Package configuration
-│       └── README.md       # Implementation guide
+├── reference/              # Reference Implementations
+│   └── python/            # Python reference implementation
+│       ├── xian_uwp/      # Core protocol implementation
+│       ├── examples/      # Usage examples
+│       └── tests/         # Test suite
 │
-├── docs/                    # Additional Documentation
-│   ├── IMPLEMENTATION.md   # Implementation guide
-│   └── COMPLIANCE.md       # Compliance testing guide
+├── docs/                   # Documentation
+│   ├── IMPLEMENTATION.md  # Implementation guide
+│   ├── COMPLIANCE.md      # Compliance testing
+│   ├── DISCOVERY.md       # Wallet discovery guide
+│   └── MOBILE.md          # Mobile integration guide
 │
-└── README.md               # This file
+└── README.md              # This file
 ```
 
 ## 🚀 Quick Start
 
 ### For DApp Developers
 
-DApps can connect to any wallet implementing the protocol:
-
+#### Basic Connection (Desktop Wallet)
 ```javascript
-// JavaScript/TypeScript
+// JavaScript/TypeScript - Direct connection
 const response = await fetch('http://localhost:8545/api/v1/auth/request', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
@@ -66,10 +82,45 @@ const { request_id } = await response.json();
 // Poll for authorization approval...
 ```
 
-```python
-# Python
-from xian_uwp.client import XianWalletClientSync
+#### Wallet Discovery (Auto-detect Available Wallets)
+```javascript
+// Discover wallets on the network
+const discovery = await fetch('http://localhost:8545/api/v1/discovery/wallets?method=all');
+const { wallets } = await discovery.json();
 
+// Connect to first available wallet
+const wallet = wallets[0];
+const client = new WalletClient(wallet.endpoint);
+```
+
+#### Mobile Wallet Connection (QR Code)
+```javascript
+// Generate QR code for mobile wallet pairing
+const pairingResp = await fetch('http://localhost:8545/api/v1/pairing/request', {
+  method: 'POST',
+  body: JSON.stringify({
+    app_name: 'My DApp',
+    app_url: 'https://mydapp.com',
+    relay_url: 'wss://relay.xian.org',
+    permissions: ['wallet_info', 'transactions']
+  })
+});
+
+const { qr_data, deep_link, pairing_id } = await pairingResp.json();
+// Display QR code with qr_data or use deep_link for mobile
+```
+
+#### Python SDK Example
+```python
+# Python - Using the reference implementation
+from xian_uwp.client import XianWalletClientSync
+from xian_uwp.discovery import WalletDiscovery
+
+# Auto-discover wallets
+discovery = WalletDiscovery()
+wallets = discovery.find_wallets(method="mdns")
+
+# Or connect directly
 client = XianWalletClientSync("My DApp", "https://mydapp.com")
 if client.connect():
     balance = client.get_balance("currency")
@@ -94,16 +145,36 @@ For other languages, implement the endpoints defined in [`protocol/openapi.yaml`
 
 ## 📋 Protocol Specification
 
+### Transport Options
+
+| Transport | Port | Use Case | Features |
+|-----------|------|----------|----------|
+| HTTP | 8545 | Local wallets | Simple, universal |
+| HTTPS | 8546 | Remote wallets | Secure, encrypted |
+| WebSocket | 8545 | Real-time updates | Live events, subscriptions |
+| gRPC | 8547 | High performance | Binary protocol, streaming |
+| Relay (WSS) | 443 | Mobile bridge | E2E encrypted, NAT traversal |
+
 ### Core Endpoints
 
 | Endpoint | Method | Description | Auth Required |
 |----------|--------|-------------|---------------|
+| **Status & Discovery** |
 | `/api/v1/wallet/status` | GET | Check wallet availability | No |
+| `/api/v1/discovery/wallets` | GET | Discover available wallets | No |
+| `/api/v1/discovery/register` | POST | Register wallet with registry | No |
+| **Pairing & Mobile** |
+| `/api/v1/pairing/request` | POST | Create QR/deep link pairing | No |
+| `/api/v1/pairing/connect` | POST | Connect via pairing data | No |
+| `/api/v1/relay/message` | POST | Send encrypted relay message | No |
+| **Authorization** |
 | `/api/v1/auth/request` | POST | Request authorization | No |
 | `/api/v1/auth/status/{id}` | GET | Check auth status | No |
+| `/api/v1/auth/revoke` | POST | Revoke session | Yes |
+| **Wallet Operations** |
 | `/api/v1/wallet/info` | GET | Get wallet information | Yes |
-| `/api/v1/transaction` | POST | Send transaction | Yes |
 | `/api/v1/balance/{contract}` | GET | Get token balance | Yes |
+| `/api/v1/transaction` | POST | Send transaction | Yes |
 | `/api/v1/sign` | POST | Sign message | Yes |
 
 ### Authorization Flow
@@ -123,6 +194,26 @@ sequenceDiagram
     DApp->>Wallet: GET /wallet/info
     Note over DApp,Wallet: Bearer {session_token}
     Wallet-->>DApp: {wallet_info}
+```
+
+### Mobile Wallet Pairing Flow
+
+```mermaid
+sequenceDiagram
+    participant DApp
+    participant Relay
+    participant Mobile Wallet
+    participant User
+
+    DApp->>DApp: Generate pairing request
+    DApp->>Relay: Connect WebSocket
+    DApp-->>User: Display QR Code
+    User->>Mobile Wallet: Scan QR Code
+    Mobile Wallet->>Relay: Connect with pairing_id
+    Mobile Wallet->>Relay: Send encrypted approval
+    Relay->>DApp: Forward encrypted message
+    DApp->>Mobile Wallet: Send transaction request
+    Note over DApp,Mobile Wallet: E2E Encrypted Channel
 ```
 
 ### Permissions
@@ -200,16 +291,46 @@ Want to contribute an implementation? See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## 🔒 Security Considerations
 
-- **Use HTTPS in production** (HTTP only for local development)
-- **Implement rate limiting** for auth attempts and transactions
-- **Validate all inputs** according to JSON schemas
-- **Use secure session tokens** (minimum 256 bits entropy)
-- **Implement proper CORS** for web-based DApps
+- **Transport Security**: Use HTTPS/WSS in production (HTTP only for local development)
+- **E2E Encryption**: Required for all relay server communications
+- **Rate Limiting**: Implement for auth attempts and transactions
+- **Input Validation**: Validate all inputs according to JSON schemas
+- **Session Security**: Use secure tokens (minimum 256 bits entropy)
+- **CORS Policy**: Implement proper CORS for web-based DApps
+- **Key Management**: Secure storage of encryption keys for pairing
+- **Replay Protection**: Use nonces for relay messages
+
+## 🆕 What's New in v2
+
+### Enhanced Discovery
+- **mDNS/Bonjour**: Automatic local network wallet discovery
+- **Registry Service**: Central registry for wallet registration
+- **Browser Detection**: Detect browser extension wallets
+- **Capability Negotiation**: Query wallet features before connecting
+
+### Mobile Support
+- **QR Code Pairing**: Seamless mobile wallet connection
+- **Deep Linking**: Direct app-to-app communication
+- **Relay Bridge**: WebSocket relay for NAT traversal
+- **E2E Encryption**: Secure communication through relay
+
+### Transport Options
+- **gRPC Support**: High-performance binary protocol
+- **TLS/HTTPS**: Secure remote connections
+- **WebSocket**: Real-time bidirectional communication
+- **Relay Server**: Mobile bridge with encryption
+
+### Developer Experience
+- **Comprehensive Error Codes**: Detailed error handling
+- **JSON Schemas**: Strict message validation
+- **Protocol Buffers**: Type-safe gRPC definitions
+- **Test Vectors**: Extensive compliance testing
 
 ## 📚 Resources
 
 - [Protocol Specification](protocol/SPECIFICATION.md) - Detailed protocol documentation
 - [OpenAPI Specification](protocol/openapi.yaml) - Machine-readable API definition
+- [gRPC Protocol](protocol/grpc/wallet.proto) - Protocol buffer definitions
 - [JSON Schemas](protocol/schemas/) - Message format definitions
 - [Test Vectors](protocol/test-vectors/) - Compliance test cases
 - [Python Reference](reference/python/) - Reference implementation

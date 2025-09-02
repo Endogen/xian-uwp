@@ -1,0 +1,251 @@
+syntax = "proto3";
+
+package xian.uwp.v2;
+
+option go_package = "github.com/xian/uwp/v2/grpc";
+option java_package = "org.xian.uwp.v2.grpc";
+option csharp_namespace = "Xian.Uwp.V2.Grpc";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// WalletService provides the gRPC interface for the Xian Universal Wallet Protocol
+service WalletService {
+  // Status and Discovery
+  rpc GetStatus(google.protobuf.Empty) returns (WalletStatus);
+  rpc DiscoverWallets(DiscoveryRequest) returns (DiscoveryResponse);
+  rpc RegisterWallet(WalletRegistration) returns (RegistrationResponse);
+  
+  // Authorization
+  rpc RequestAuthorization(AuthorizationRequest) returns (AuthorizationResponse);
+  rpc GetAuthorizationStatus(AuthStatusRequest) returns (AuthStatusResponse);
+  rpc RevokeAuthorization(RevokeRequest) returns (google.protobuf.Empty);
+  
+  // Wallet Operations
+  rpc GetWalletInfo(SessionRequest) returns (WalletInfo);
+  rpc GetBalance(BalanceRequest) returns (BalanceResponse);
+  rpc GetTransactionHistory(HistoryRequest) returns (HistoryResponse);
+  
+  // Transactions
+  rpc SendTransaction(TransactionRequest) returns (TransactionResponse);
+  rpc SignMessage(SignRequest) returns (SignResponse);
+  
+  // Pairing (Mobile Bridge)
+  rpc CreatePairing(PairingRequest) returns (PairingResponse);
+  rpc ConnectPairing(PairingConnect) returns (PairingConnected);
+  
+  // Streaming for real-time updates
+  rpc SubscribeToEvents(EventSubscription) returns (stream WalletEvent);
+}
+
+// Enums
+enum WalletType {
+  WALLET_TYPE_UNSPECIFIED = 0;
+  WALLET_TYPE_DESKTOP = 1;
+  WALLET_TYPE_WEB = 2;
+  WALLET_TYPE_CLI = 3;
+  WALLET_TYPE_HARDWARE = 4;
+  WALLET_TYPE_MOBILE = 5;
+}
+
+enum Permission {
+  PERMISSION_UNSPECIFIED = 0;
+  PERMISSION_WALLET_INFO = 1;
+  PERMISSION_BALANCE = 2;
+  PERMISSION_TRANSACTIONS = 3;
+  PERMISSION_SIGN_MESSAGE = 4;
+  PERMISSION_ADD_TOKEN = 5;
+}
+
+enum AuthorizationStatus {
+  AUTH_STATUS_UNSPECIFIED = 0;
+  AUTH_STATUS_PENDING = 1;
+  AUTH_STATUS_APPROVED = 2;
+  AUTH_STATUS_DENIED = 3;
+  AUTH_STATUS_EXPIRED = 4;
+}
+
+// Messages
+message WalletStatus {
+  bool available = 1;
+  bool locked = 2;
+  WalletType wallet_type = 3;
+  string network = 4;
+  string chain_id = 5;
+  string version = 6;
+  repeated string capabilities = 7;
+}
+
+message DiscoveryRequest {
+  string method = 1; // mdns, registry, all
+  WalletType type_filter = 2;
+}
+
+message DiscoveryResponse {
+  repeated DiscoveredWallet wallets = 1;
+  string discovery_method = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+message DiscoveredWallet {
+  string wallet_id = 1;
+  string name = 2;
+  WalletType type = 3;
+  string endpoint = 4;
+  string version = 5;
+  repeated string capabilities = 6;
+  string icon = 7;
+}
+
+message WalletRegistration {
+  string wallet_id = 1;
+  string name = 2;
+  WalletType type = 3;
+  string endpoint = 4;
+  string public_key = 5;
+  repeated string capabilities = 6;
+  map<string, string> metadata = 7;
+}
+
+message RegistrationResponse {
+  string wallet_id = 1;
+  google.protobuf.Timestamp registered_at = 2;
+}
+
+message AuthorizationRequest {
+  string app_name = 1;
+  string app_url = 2;
+  string app_icon = 3;
+  repeated Permission permissions = 4;
+  int32 session_duration = 5;
+}
+
+message AuthorizationResponse {
+  string request_id = 1;
+  AuthorizationStatus status = 2;
+  string message = 3;
+}
+
+message AuthStatusRequest {
+  string request_id = 1;
+}
+
+message AuthStatusResponse {
+  string request_id = 1;
+  AuthorizationStatus status = 2;
+  string session_token = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+message RevokeRequest {
+  string session_token = 1;
+}
+
+message SessionRequest {
+  string session_token = 1;
+}
+
+message WalletInfo {
+  string address = 1;
+  string public_key = 2;
+  WalletType wallet_type = 3;
+  string network = 4;
+  string chain_id = 5;
+}
+
+message BalanceRequest {
+  string session_token = 1;
+  string contract = 2;
+}
+
+message BalanceResponse {
+  string balance = 1;
+  string contract = 2;
+  string symbol = 3;
+  int32 decimals = 4;
+}
+
+message HistoryRequest {
+  string session_token = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message HistoryResponse {
+  repeated Transaction transactions = 1;
+  int32 total = 2;
+}
+
+message Transaction {
+  string hash = 1;
+  string from = 2;
+  string to = 3;
+  string amount = 4;
+  string contract = 5;
+  google.protobuf.Timestamp timestamp = 6;
+  string status = 7;
+}
+
+message TransactionRequest {
+  string session_token = 1;
+  string contract = 2;
+  string function = 3;
+  map<string, string> kwargs = 4;
+  int64 stamps_supplied = 5;
+}
+
+message TransactionResponse {
+  bool success = 1;
+  string hash = 2;
+  string error = 3;
+  string result = 4;
+}
+
+message SignRequest {
+  string session_token = 1;
+  string message = 2;
+}
+
+message SignResponse {
+  string signature = 1;
+  string public_key = 2;
+}
+
+message PairingRequest {
+  string app_name = 1;
+  string app_url = 2;
+  string relay_url = 3;
+  repeated Permission permissions = 4;
+  int32 expiry_seconds = 5;
+}
+
+message PairingResponse {
+  string pairing_id = 1;
+  string qr_data = 2;
+  string deep_link = 3;
+  string relay_url = 4;
+  string public_key = 5;
+  google.protobuf.Timestamp expires_at = 6;
+}
+
+message PairingConnect {
+  string pairing_data = 1;
+  string wallet_public_key = 2;
+}
+
+message PairingConnected {
+  string session_id = 1;
+  string relay_url = 2;
+  bool encrypted_channel = 3;
+}
+
+message EventSubscription {
+  string session_token = 1;
+  repeated string event_types = 2;
+}
+
+message WalletEvent {
+  string event_type = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  map<string, string> data = 3;
+}

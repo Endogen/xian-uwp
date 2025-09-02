@@ -54,7 +54,25 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 - **Message Format**: JSON text frames
 - **Purpose**: Real-time event notifications
 
-### 3.3 CORS Requirements
+### 3.3 TLS/HTTPS Support (RECOMMENDED)
+
+For production deployments and remote wallet servers:
+
+- **Protocol**: HTTPS with TLS 1.2 or higher
+- **Certificate**: Valid SSL certificate (self-signed allowed for development)
+- **Port**: 8546 (default for HTTPS, SHOULD be configurable)
+- **Enforcement**: Wallets SHOULD enforce HTTPS for non-localhost connections
+
+### 3.4 gRPC Transport (Optional)
+
+For high-performance applications:
+
+- **Protocol**: gRPC over HTTP/2
+- **Port**: 8547 (default, SHOULD be configurable)
+- **Service Definition**: See `protocol/grpc/wallet.proto`
+- **Purpose**: Binary protocol for performance-critical applications
+
+### 3.5 CORS Requirements
 
 Wallet implementations MUST support CORS for web-based DApps:
 
@@ -67,9 +85,141 @@ Access-Control-Max-Age: 86400
 
 Production implementations SHOULD restrict `Access-Control-Allow-Origin` to specific domains.
 
-## 4. Authentication & Authorization
+## 4. Wallet Discovery
 
-### 4.1 Authorization Flow
+### 4.1 Discovery Methods
+
+Wallets SHOULD implement at least one discovery method:
+
+#### 4.1.1 mDNS/DNS-SD (Local Network)
+
+- **Service Type**: `_xian-wallet._tcp`
+- **TXT Records**:
+  - `version`: Protocol version (e.g., "2.0.0")
+  - `name`: Wallet display name
+  - `type`: Wallet type (desktop|mobile|hardware|web)
+  - `id`: Unique wallet identifier
+
+Example mDNS advertisement:
+```
+wallet._xian-wallet._tcp.local. 120 IN SRV 0 0 8545 wallet-host.local.
+wallet._xian-wallet._tcp.local. 120 IN TXT "version=2.0.0" "name=My Wallet" "type=desktop"
+```
+
+#### 4.1.2 Registry Service (Cloud-Based)
+
+Wallets MAY register with a discovery service:
+
+```http
+POST https://registry.xian.org/api/v1/wallets/register
+{
+  "wallet_id": "unique-wallet-id",
+  "name": "My Wallet",
+  "type": "mobile",
+  "endpoint": "https://wallet.example.com:8546",
+  "public_key": "...",
+  "capabilities": ["qr_pairing", "deep_linking"]
+}
+```
+
+#### 4.1.3 Browser Extension Detection
+
+Browser-based wallets SHOULD inject a discovery object:
+
+```javascript
+window.xianWallets = {
+  "wallet-id": {
+    name: "My Wallet",
+    version: "2.0.0",
+    connect: async () => { /* connection logic */ }
+  }
+}
+```
+
+#### 4.1.4 QR Code Discovery
+
+Mobile wallets SHOULD support QR code-based discovery:
+
+```json
+{
+  "protocol": "xian-uwp",
+  "version": "2.0.0",
+  "endpoint": "https://wallet.example.com:8546",
+  "session_id": "unique-session-id",
+  "public_key": "..."
+}
+```
+
+### 4.2 Discovery Flow
+
+```mermaid
+sequenceDiagram
+    participant DApp
+    participant Discovery
+    participant Wallet
+    
+    DApp->>Discovery: Query available wallets
+    Discovery-->>DApp: List of wallets
+    DApp->>DApp: User selects wallet
+    DApp->>Wallet: Connect to selected wallet
+    Wallet-->>DApp: Connection established
+```
+
+## 5. Mobile Bridge Support
+
+### 5.1 Relay Server Architecture
+
+For mobile-to-web communication:
+
+```
+┌─────────────┐     WebSocket      ┌─────────────┐     WebSocket      ┌─────────────┐
+│  Web DApp   │ ◄────────────────► │Relay Server │ ◄────────────────► │Mobile Wallet│
+└─────────────┘                     └─────────────┘                     └─────────────┘
+```
+
+### 5.2 Pairing Flow
+
+#### 5.2.1 QR Code Pairing
+
+1. DApp generates pairing request with unique session ID
+2. DApp displays QR code containing relay server URL and session ID
+3. Mobile wallet scans QR code
+4. Both parties connect to relay server using session ID
+5. End-to-end encrypted channel established
+
+#### 5.2.2 Deep Linking
+
+Mobile wallets MUST support deep links:
+
+```
+xian-wallet://connect?relay=wss://relay.xian.org&session=abc123&key=...
+```
+
+### 5.3 Relay Protocol
+
+Messages relayed between DApp and wallet:
+
+```json
+{
+  "type": "relay_message",
+  "session_id": "unique-session-id",
+  "from": "dapp|wallet",
+  "encrypted_payload": "base64-encoded-encrypted-data",
+  "timestamp": 1234567890
+}
+```
+
+### 5.4 End-to-End Encryption
+
+All relay messages MUST be encrypted:
+
+1. ECDH key exchange during pairing
+2. AES-256-GCM for message encryption
+3. HMAC-SHA256 for message authentication
+
+## 6. Authentication & Authorization
+
+### 6.1 Authorization Flow
 
 ```mermaid
 sequenceDiagram
@@ -96,14 +246,14 @@ sequenceDiagram
     Wallet-->>DApp: {wallet info}
 ```
 
-### 4.2 Session Management
+### 6.2 Session Management
 
 - Session tokens MUST be cryptographically secure (minimum 256 bits of entropy)
 - Sessions MUST expire after a configurable timeout (default: 60 minutes)
 - Sessions MUST be revocable by the user
 - Implementations SHOULD limit the number of concurrent sessions
 
-### 4.3 Permissions
+### 6.3 Permissions
 
 Permissions control what operations a DApp can perform:
 
@@ -115,9 +265,9 @@ Permissions control what operations a DApp can perform:
 | `sign_message` | Sign messages | POST /sign |
 | `add_token` | Add custom tokens | POST /tokens/add |
 
-## 5. API Endpoints
+## 7. API Endpoints
 
-### 5.1 Status Endpoints (No Auth Required)
+### 7.1 Status Endpoints (No Auth Required)
 
 #### GET /api/v1/wallet/status
 
@@ -135,7 +285,7 @@ Returns wallet availability and basic status.
 }
 ```
 
-### 5.2 Authorization Endpoints
+### 7.2 Authorization Endpoints
 
 #### POST /api/v1/auth/request
 
@@ -183,7 +333,7 @@ Check authorization request status.
 }
 ```
 
-### 5.3 Wallet Endpoints (Auth Required)
+### 7.3 Wallet Endpoints (Auth Required)
 
 All endpoints in this section require the `Authorization: Bearer {session_token}` header.
 
@@ -215,7 +365,7 @@ Unlock the wallet with a password.
 }
 ```
 
-### 5.4 Transaction Endpoints (Auth Required)
+### 7.4 Transaction Endpoints (Auth Required)
 
 #### POST /api/v1/transaction
 
@@ -264,7 +414,7 @@ Sign a message. Requires `sign_message` permission.
 }
 ```
 
-### 5.5 Token Endpoints (Auth Required)
+### 7.5 Token Endpoints (Auth Required)
 
 #### GET /api/v1/balance/{contract}
 
@@ -280,9 +430,9 @@ Get token balance. Requires `balance` permission.
 }
 ```
 
-## 6. Error Handling
+## 8. Error Handling
 
-### 6.1 Error Response Format
+### 8.1 Error Response Format
 
 All error responses MUST follow this format:
 
@@ -290,25 +440,76 @@ All error responses MUST follow this format:
 {
   "error": "Human-readable error message",
   "code": "ERROR_CODE",
-  "details": "Optional additional details"
+  "details": {
+    "field": "Optional field that caused the error",
+    "reason": "Detailed technical reason",
+    "suggestion": "How to fix the error"
+  },
+  "request_id": "Original request ID if applicable",
+  "timestamp": "ISO8601 timestamp"
 }
 ```
 
-### 6.2 Standard Error Codes
+### 8.2 Standard Error Codes
 
-| Code | HTTP Status | Description |
-|------|-------------|-------------|
-| `WALLET_LOCKED` | 423 | Wallet is locked |
-| `UNAUTHORIZED` | 401 | Missing or invalid authorization |
-| `SESSION_EXPIRED` | 401 | Session token has expired |
-| `INVALID_REQUEST` | 400 | Request validation failed |
-| `INSUFFICIENT_BALANCE` | 400 | Insufficient token balance |
-| `TRANSACTION_FAILED` | 400 | Transaction execution failed |
-| `WALLET_NOT_FOUND` | 404 | Wallet not available |
-| `MAX_SESSIONS_EXCEEDED` | 429 | Too many active sessions |
-| `TOO_MANY_ATTEMPTS` | 429 | Rate limit exceeded |
+#### Authentication & Authorization Errors
 
-### 6.3 HTTP Status Codes
+| Code | HTTP Status | Description | Recovery |
+|------|-------------|-------------|----------|
+| `WALLET_LOCKED` | 423 | Wallet is locked | User must unlock wallet |
+| `UNAUTHORIZED` | 401 | Missing or invalid authorization | Request new authorization |
+| `SESSION_EXPIRED` | 401 | Session token has expired | Request new authorization |
+| `INVALID_TOKEN` | 401 | Invalid session token format | Request new authorization |
+| `PERMISSION_DENIED` | 403 | Operation not permitted | Request additional permissions |
+| `AUTH_PENDING` | 202 | Authorization still pending | Continue polling |
+| `AUTH_DENIED` | 403 | User denied authorization | Inform user, retry later |
+| `AUTH_TIMEOUT` | 408 | Authorization request timed out | Create new request |
+
+#### Request Validation Errors
+
+| Code | HTTP Status | Description | Recovery |
+|------|-------------|-------------|----------|
+| `INVALID_REQUEST` | 400 | Request validation failed | Check request format |
+| `MISSING_PARAMETER` | 400 | Required parameter missing | Add missing parameter |
+| `INVALID_PARAMETER` | 400 | Parameter value invalid | Correct parameter value |
+| `INVALID_ADDRESS` | 400 | Invalid blockchain address | Validate address format |
+| `INVALID_AMOUNT` | 400 | Invalid amount value | Check amount format |
+| `INVALID_CONTRACT` | 400 | Contract does not exist | Verify contract name |
+
+#### Transaction Errors
+
+| Code | HTTP Status | Description | Recovery |
+|------|-------------|-------------|----------|
+| `INSUFFICIENT_BALANCE` | 400 | Insufficient token balance | Check balance first |
+| `INSUFFICIENT_STAMPS` | 400 | Insufficient stamps for transaction | Increase stamps_supplied |
+| `TRANSACTION_FAILED` | 400 | Transaction execution failed | Check error details |
+| `SIMULATION_FAILED` | 400 | Transaction simulation failed | Review transaction parameters |
+| `NONCE_MISMATCH` | 409 | Transaction nonce conflict | Retry with correct nonce |
+| `ALREADY_SUBMITTED` | 409 | Transaction already submitted | Check transaction status |
+
+#### System Errors
+
+| Code | HTTP Status | Description | Recovery |
+|------|-------------|-------------|----------|
+| `WALLET_NOT_FOUND` | 404 | Wallet service not available | Check wallet is running |
+| `ENDPOINT_NOT_FOUND` | 404 | API endpoint does not exist | Check API version |
+| `METHOD_NOT_ALLOWED` | 405 | HTTP method not allowed | Use correct HTTP method |
+| `MAX_SESSIONS_EXCEEDED` | 429 | Too many active sessions | Close existing sessions |
+| `RATE_LIMIT_EXCEEDED` | 429 | Too many requests | Implement backoff |
+| `SERVICE_UNAVAILABLE` | 503 | Wallet service unavailable | Retry with backoff |
+| `INTERNAL_ERROR` | 500 | Internal server error | Report bug, retry later |
+| `NOT_IMPLEMENTED` | 501 | Feature not implemented | Use alternative method |
+
+#### Discovery & Pairing Errors
+
+| Code | HTTP Status | Description | Recovery |
+|------|-------------|-------------|----------|
+| `DISCOVERY_FAILED` | 503 | Wallet discovery failed | Check network, retry |
+| `PAIRING_FAILED` | 400 | QR/Deep link pairing failed | Generate new pairing request |
+| `RELAY_UNAVAILABLE` | 503 | Relay server unavailable | Use direct connection |
+| `ENCRYPTION_FAILED` | 500 | E2E encryption setup failed | Retry pairing |
+
+### 8.3 HTTP Status Codes
 
 - **200 OK**: Request succeeded
 - **202 Accepted**: Request accepted, processing async
@@ -321,7 +522,7 @@ All error responses MUST follow this format:
 - **500 Internal Server Error**: Server error
 - **503 Service Unavailable**: Wallet service unavailable
 
-## 7. Security Considerations
+## 9. Security Considerations
 
 ### 7.1 Transport Security
 
@@ -351,7 +552,7 @@ All inputs MUST be validated:
 - Contract and function names must match allowed patterns
 - Numeric values must be within acceptable ranges
 
-## 8. WebSocket Events (Optional)
+## 10. WebSocket Events (Optional)
 
 WebSocket connections enable real-time notifications:
 
@@ -386,7 +587,7 @@ WebSocket connections enable real-time notifications:
 }
 ```
 
-## 9. Implementation Requirements
+## 11. Implementation Requirements
 
 ### 9.1 Minimum Required Endpoints
 
@@ -411,7 +612,7 @@ Implementations MUST pass all test vectors in:
 - `/protocol/test-vectors/auth-flow.json`
 - `/protocol/test-vectors/transaction-flow.json`
 
-## 10. Versioning
+## 12. Versioning
 
 ### 10.1 Protocol Version
 
@@ -424,7 +625,7 @@ The protocol version follows Semantic Versioning:
 
 Clients SHOULD check the protocol version via `/api/v1/wallet/status` and handle version mismatches gracefully.
 
-## 11. Extensions
+## 13. Extensions
 
 ### 11.1 Custom Endpoints
 
@@ -439,77 +640,13 @@ Implementations MAY define additional permissions with `x_` prefix:
 - `x_vendor_feature`
 - Custom permissions MUST be documented
 
-## 12. References
+## 14. References
 
 - [RFC 2119](https://www.ietf.org/rfc/rfc2119.txt) - Key words for use in RFCs
 - [RFC 6455](https://tools.ietf.org/html/rfc6455) - The WebSocket Protocol
 - [RFC 7231](https://tools.ietf.org/html/rfc7231) - HTTP/1.1 Semantics
 - [JSON Schema](https://json-schema.org/) - JSON Schema Specification
 - [OpenAPI 3.0](https://swagger.io/specification/) - OpenAPI Specification
-
-## 8. WebSocket Support (Optional)
-
-Implementations MAY provide WebSocket support for real-time updates as an enhancement to the HTTP polling mechanism.
-
-### 8.1 WebSocket Endpoint
-
-- **URL**: `ws://[host]:[port]/ws/v1`
-- **Protocol**: WebSocket (RFC 6455)
-- **Authentication**: Not required for connection, but subscriptions may require valid request_id
-
-### 8.2 Message Format
-
-All WebSocket messages MUST be JSON-encoded text frames.
-
-#### Client to Server Messages
-
-```json
-{
-  "type": "subscribe",
-  "request_id": "string"  // Subscribe to authorization updates
-}
-
-{
-  "type": "unsubscribe",
-  "request_id": "string"  // Unsubscribe from updates
-}
-
-{
-  "type": "ping"  // Heartbeat
-}
-```
-
-#### Server to Client Messages
-
-```json
-{
-  "type": "authorization_approved",
-  "request_id": "string",
-  "session_token": "string",
-  "timestamp": "ISO8601"
-}
-
-{
-  "type": "authorization_denied",
-  "request_id": "string",
-  "reason": "string",
-  "timestamp": "ISO8601"
-}
-
-{
-  "type": "pong"  // Heartbeat response
-}
-```
-
-### 8.3 Connection Management
-
-- Implementations SHOULD send ping/pong frames every 30 seconds
-- Clients SHOULD implement automatic reconnection with exponential backoff
-- Servers MAY limit the number of concurrent WebSocket connections per client
-
-### 8.4 Graceful Degradation
-
-DApps MUST NOT require WebSocket support. The HTTP polling mechanism MUST always be available as a fallback.
 
 ## Appendix A: Example Implementation Flow
 

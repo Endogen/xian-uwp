@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://xian.org/schemas/uwp/v2/pairing/pairing-response.json",
+  "title": "Pairing Response",
+  "description": "Response containing pairing data for QR code and deep link",
+  "type": "object",
+  "required": ["pairing_id", "qr_data", "deep_link"],
+  "properties": {
+    "pairing_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9-_]{16,64}$",
+      "description": "Unique pairing identifier"
+    },
+    "qr_data": {
+      "type": "object",
+      "required": ["protocol", "version", "pairing_id"],
+      "properties": {
+        "protocol": {
+          "type": "string",
+          "const": "xian-uwp",
+          "description": "Protocol identifier"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Protocol version"
+        },
+        "pairing_id": {
+          "type": "string",
+          "description": "Pairing identifier"
+        },
+        "relay_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Relay server URL"
+        },
+        "public_key": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]{43,44}=$",
+          "description": "Base64 encoded public key for E2E encryption"
+        },
+        "endpoint": {
+          "type": "string",
+          "format": "uri",
+          "description": "Direct wallet endpoint if available"
+        }
+      },
+      "description": "Data to encode in QR code"
+    },
+    "deep_link": {
+      "type": "string",
+      "pattern": "^xian-wallet://",
+      "description": "Deep link URL for mobile wallets"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Expiration timestamp"
+    },
+    "relay_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Relay server URL if using mobile bridge"
+    },
+    "public_key": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]{43,44}=$",
+      "description": "Base64 encoded public key for E2E encryption"
+    }
+  }
+}
