@@ -17,7 +17,9 @@ info:
 
 servers:
   - url: http://localhost:8545/api/v1
-    description: Default local wallet server
+    description: Default local wallet server (HTTP)
+  - url: https://localhost:8546/api/v1
+    description: Default local wallet server (HTTPS)
   - url: http://{host}:{port}/api/v1
     description: Custom wallet server
     variables:
@@ -27,10 +29,20 @@ servers:
       port:
         default: '8545'
         description: Wallet server port
+  - url: wss://{relay}/api/v1
+    description: Relay server for mobile bridge
+    variables:
+      relay:
+        default: relay.xian.org
+        description: Relay server hostname
 
 tags:
   - name: Status
     description: Wallet status and health endpoints
+  - name: Discovery
+    description: Wallet discovery and registration
+  - name: Pairing
+    description: Mobile wallet pairing via QR/deep links
   - name: Authorization
     description: DApp authorization and session management
   - name: Wallet
@@ -39,6 +51,8 @@ tags:
     description: Transaction operations
   - name: Tokens
     description: Token management
+  - name: Relay
+    description: Relay server operations for mobile bridge
 
 paths:
   /wallet/status:
@@ -60,6 +74,138 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /discovery/wallets:
+    get:
+      tags: [Discovery]
+      summary: Discover available wallets
+      description: Query available wallets via mDNS or registry service
+      operationId: discoverWallets
+      parameters:
+        - name: method
+          in: query
+          description: Discovery method to use
+          schema:
+            type: string
+            enum: [mdns, registry, all]
+            default: all
+        - name: type
+          in: query
+          description: Filter by wallet type
+          schema:
+            type: string
+            enum: [desktop, mobile, hardware, web]
+      responses:
+        '200':
+          description: List of discovered wallets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wallets:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DiscoveredWallet'
+
+  /discovery/register:
+    post:
+      tags: [Discovery]
+      summary: Register wallet with discovery service
+      description: Register this wallet with the discovery registry
+      operationId: registerWallet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WalletRegistration'
+      responses:
+        '201':
+          description: Wallet registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wallet_id:
+                    type: string
+                  registered_at:
+                    type: string
+                    format: date-time
+
+  /pairing/request:
+    post:
+      tags: [Pairing]
+      summary: Create pairing request
+      description: Generate a new pairing request for QR code or deep link
+      operationId: createPairingRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PairingRequest'
+      responses:
+        '201':
+          description: Pairing request created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PairingResponse'
+
+  /pairing/connect:
+    post:
+      tags: [Pairing]
+      summary: Connect via pairing
+      description: Connect to a DApp using pairing data from QR code or deep link
+      operationId: connectPairing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PairingConnect'
+      responses:
+        '200':
+          description: Pairing successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: string
+                  relay_url:
+                    type: string
+                  encrypted_channel:
+                    type: boolean
+
+  /relay/message:
+    post:
+      tags: [Relay]
+      summary: Send relay message
+      description: Send an encrypted message through the relay server
+      operationId: sendRelayMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelayMessage'
+      responses:
+        '202':
+          description: Message queued for relay
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message_id:
+                    type: string
+                  queued_at:
+                    type: string
+                    format: date-time
 
   /auth/request:
     post:
@@ -544,6 +690,133 @@ components:
       type: string
       enum: [desktop, web, cli, hardware, mobile]
       description: Type of wallet implementation
+
+    DiscoveredWallet:
+      type: object
+      required: [wallet_id, name, type, endpoint]
+      properties:
+        wallet_id:
+          type: string
+          description: Unique wallet identifier
+        name:
+          type: string
+          description: Display name of the wallet
+        type:
+          $ref: '#/components/schemas/WalletType'
+        endpoint:
+          type: string
+          description: Wallet API endpoint URL
+        version:
+          type: string
+          description: Protocol version supported
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum: [qr_pairing, deep_linking, relay_bridge, websocket]
+          description: Supported capabilities
+        icon:
+          type: string
+          description: URL to wallet icon
+
+    WalletRegistration:
+      type: object
+      required: [wallet_id, name, type, endpoint]
+      properties:
+        wallet_id:
+          type: string
+          description: Unique wallet identifier
+        name:
+          type: string
+          description: Display name of the wallet
+        type:
+          $ref: '#/components/schemas/WalletType'
+        endpoint:
+          type: string
+          description: Wallet API endpoint URL
+        public_key:
+          type: string
+          description: Public key for verification
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: Supported capabilities
+        metadata:
+          type: object
+          description: Additional wallet metadata
+
+    PairingRequest:
+      type: object
+      required: [app_name, app_url]
+      properties:
+        app_name:
+          type: string
+          description: Name of the DApp
+        app_url:
+          type: string
+          description: URL of the DApp
+        relay_url:
+          type: string
+          description: Relay server URL for mobile bridge
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Permission'
+        expiry_seconds:
+          type: integer
+          default: 300
+          description: Pairing request expiry time
+
+    PairingResponse:
+      type: object
+      required: [pairing_id, qr_data, deep_link]
+      properties:
+        pairing_id:
+          type: string
+          description: Unique pairing identifier
+        qr_data:
+          type: string
+          description: Data to encode in QR code
+        deep_link:
+          type: string
+          description: Deep link URL for mobile wallets
+        relay_url:
+          type: string
+          description: Relay server URL if using mobile bridge
+        public_key:
+          type: string
+          description: Public key for E2E encryption
+
+    PairingConnect:
+      type: object
+      required: [pairing_data]
+      properties:
+        pairing_data:
+          type: string
+          description: Data from QR code or deep link
+        wallet_public_key:
+          type: string
+          description: Wallet's public key for E2E encryption
+
+    RelayMessage:
+      type: object
+      required: [session_id, encrypted_payload]
+      properties:
+        session_id:
+          type: string
+          description: Session identifier for routing
+        from:
+          type: string
+          enum: [dapp, wallet]
+          description: Message sender type
+        encrypted_payload:
+          type: string
+          description: Base64 encoded encrypted message
+        timestamp:
+          type: string
+          format: date-time
+          description: Message timestamp
 
     Permission:
       type: string

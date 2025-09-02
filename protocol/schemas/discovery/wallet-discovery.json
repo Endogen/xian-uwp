@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://xian.org/schemas/uwp/v2/discovery/wallet-discovery.json",
+  "title": "Wallet Discovery Response",
+  "description": "Response from wallet discovery query",
+  "type": "object",
+  "required": ["wallets"],
+  "properties": {
+    "wallets": {
+      "type": "array",
+      "description": "List of discovered wallets",
+      "items": {
+        "$ref": "#/definitions/DiscoveredWallet"
+      }
+    },
+    "discovery_method": {
+      "type": "string",
+      "enum": ["mdns", "registry", "browser", "mixed"],
+      "description": "Method used for discovery"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Discovery timestamp"
+    }
+  },
+  "definitions": {
+    "DiscoveredWallet": {
+      "type": "object",
+      "required": ["wallet_id", "name", "type", "endpoint"],
+      "properties": {
+        "wallet_id": {
+          "type": "string",
+          "description": "Unique wallet identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the wallet"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["desktop", "web", "cli", "hardware", "mobile"],
+          "description": "Type of wallet"
+        },
+        "endpoint": {
+          "type": "string",
+          "format": "uri",
+          "description": "Wallet API endpoint URL"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Protocol version supported"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["qr_pairing", "deep_linking", "relay_bridge", "websocket", "grpc"]
+          },
+          "description": "Supported capabilities"
+        },
+        "icon": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to wallet icon"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Additional wallet metadata"
+        }
+      }
+    }
+  }
+}

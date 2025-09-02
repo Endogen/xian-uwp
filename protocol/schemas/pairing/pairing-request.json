@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://xian.org/schemas/uwp/v2/pairing/pairing-request.json",
+  "title": "Pairing Request",
+  "description": "Request to create a pairing for QR code or deep link",
+  "type": "object",
+  "required": ["app_name", "app_url"],
+  "properties": {
+    "app_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Name of the DApp requesting pairing"
+    },
+    "app_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL of the DApp"
+    },
+    "app_icon": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL to DApp icon"
+    },
+    "relay_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^wss?://",
+      "description": "WebSocket relay server URL for mobile bridge"
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["wallet_info", "balance", "transactions", "sign_message", "add_token"]
+      },
+      "description": "Requested permissions"
+    },
+    "chain_id": {
+      "type": "string",
+      "description": "Target blockchain network"
+    },
+    "expiry_seconds": {
+      "type": "integer",
+      "minimum": 60,
+      "maximum": 3600,
+      "default": 300,
+      "description": "Pairing request expiry time in seconds"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata for the pairing request"
+    }
+  }
+}
