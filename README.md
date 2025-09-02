@@ -408,7 +408,7 @@ else:
     print("Failed to connect to wallet")
 ```
 
-### Legacy Compatibility
+### JavaScript Example
 
 For JavaScript DApps, use the HTTP API directly:
 
@@ -964,7 +964,7 @@ const balance = await client.getBalance('currency');
 - **Complete API Coverage** - All protocol features available
 - **Modern JavaScript** - Uses async/await and fetch API
 
-### Legacy Web DApp Example
+### Web DApp Example
 
 ```html
 <!-- Direct HTTP API usage -->
@@ -1124,24 +1124,15 @@ const balance = await client.getBalance('currency');
 4. **Cache wallet info** appropriately
 5. **Test with multiple wallet types**
 
-## Migration from dapp-utils
+## Why Use Xian UWP?
 
-### For Existing DApps
+### Benefits
 
-**Migration to HTTP API:** Use the standardized HTTP endpoints:
-
-```javascript
-// Updated code using HTTP API
-const response = await fetch('http://localhost:8545/api/v1/wallet/balance/currency');
-const balance = await response.json();
-```
-
-### Benefits of Migration
-
-- **Multi-wallet support**: Works with desktop, CLI, and web wallets
-- **Better performance**: Local HTTP is faster than extension messaging
-- **More reliable**: Direct communication, no extension dependencies
+- **Multi-wallet support**: Works with any wallet implementation
 - **Language agnostic**: Use Python, JavaScript, or any language
+- **Better performance**: Direct HTTP communication
+- **More reliable**: Standardized protocol with clear specifications
+- **Future-proof**: Extensible design for new features
 
 ## Development & Testing
 

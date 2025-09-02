@@ -416,9 +416,9 @@ Implementations MUST pass all test vectors in:
 ### 10.1 Protocol Version
 
 The protocol version follows Semantic Versioning:
-- MAJOR: Incompatible API changes
-- MINOR: Backwards-compatible functionality additions
-- PATCH: Backwards-compatible bug fixes
+- MAJOR: Breaking API changes
+- MINOR: New functionality additions
+- PATCH: Bug fixes and clarifications
 
 ### 10.2 Version Negotiation
 
@@ -558,11 +558,9 @@ print(tx_result.json())
 ## Appendix B: Change Log
 
 ### Version 2.0.0 (2024)
-- Complete rewrite as language-agnostic specification
-- Added OpenAPI specification
-- Added JSON Schema definitions
-- Added test vectors for compliance testing
-- Improved security requirements
-
-### Version 1.0.0 (2023)
-- Initial Python-specific implementation
+- Initial release as language-agnostic specification
+- OpenAPI specification for machine-readable API definition
+- JSON Schema definitions for all message formats
+- Test vectors for compliance testing
+- Comprehensive security requirements
+- WebSocket support for real-time updates (optional)

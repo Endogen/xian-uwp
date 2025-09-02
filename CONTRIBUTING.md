@@ -101,7 +101,7 @@ python protocol/validator.py --url http://localhost:8545
 - Use clear, unambiguous language
 - Follow RFC 2119 for requirement levels
 - Include examples
-- Maintain backwards compatibility
+- Consider extensibility for future features
 
 ### Test Vectors
 
